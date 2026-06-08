@@ -1,1 +1,68 @@
 @import "tailwindcss";
+
+@theme {
+  --color-inquest-base: #EADFC8;
+  --color-inquest-surface: #F2E9D8;
+  --color-inquest-depth: #DFD3BB;
+  
+  --color-inquest-rule: #D1C3A9;
+  
+  --color-inquest-ink: #3E2723;
+  --color-inquest-ink-mid: #5D4037;
+  --color-inquest-ink-soft: #8D6E63;
+  --color-inquest-ink-ghost: #BCAAA4;
+  
+  --color-inquest-accent: #D87040;
+  --color-inquest-accent-soft: #E08A63;
+  --color-inquest-accent-pale: #FBE6DC;
+  
+  --color-inquest-sage: #E5A93C;
+  --color-inquest-caution: #C62828;
+
+  --font-serif: var(--font-playfair);
+  --font-sans: var(--font-inter);
+
+  --radius-fluid: 2rem;
+  --radius-fluid-lg: 3rem;
+
+  --animate-fade-in-up: fade-in-up 0.5s ease-out forwards;
+}
+
+@keyframes fade-in-up {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@layer utilities {
+  .fluid-border {
+    border-radius: var(--radius-fluid);
+  }
+  .fluid-border-lg {
+    border-radius: var(--radius-fluid-lg);
+  }
+  .warm-shadow {
+    box-shadow: 0 10px 25px -5px rgba(62, 39, 35, 0.08), 0 8px 10px -6px rgba(62, 39, 35, 0.04);
+  }
+  .terracotta-glow {
+    box-shadow: 0 4px 14px 0 rgba(216, 112, 64, 0.39);
+  }
+  .card-lift {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  .card-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 30px -5px rgba(62, 39, 35, 0.12), 0 8px 10px -6px rgba(62, 39, 35, 0.04);
+  }
+}
+
+body {
+  background-color: var(--color-inquest-base);
+  color: var(--color-inquest-ink);
+  font-family: var(--font-sans);
+}

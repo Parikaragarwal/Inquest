@@ -9,7 +9,7 @@ const fieldInputModel = z.object({
   type: z.enum(FORM_FIELD_TYPES),
   required: z.boolean(),
   placeholder: z.string().optional().nullable(),
-  validation: z.record(z.string(), z.any()).optional().nullable(),
+  validation: z.record(z.string(), z.unknown()).optional().nullable(),
   orderIndex: z.number(),
 });
 

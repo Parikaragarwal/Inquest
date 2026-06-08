@@ -1,0 +1,331 @@
+'use client';
+
+import { useState } from 'react';
+import { useParams, useSearchParams, useRouter } from 'next/navigation';
+import { trpc } from '~/trpc/client';
+import { motion } from 'framer-motion';
+import { useGetuser } from '~/hooks/api/auth';
+import { toast } from 'sonner';
+import { Lock, CheckCircle2, AlertCircle } from 'lucide-react';
+import Link from 'next/link';
+
+export default function PublicFormSubmissionPage() {
+  const params = useParams();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  
+  const formId = params?.formId as string;
+  const secureCode = searchParams.get('code');
+
+  const { user, isSignedIn, isLoading: isAuthLoading } = useGetuser();
+  const [answers, setAnswers] = useState<Record<string, any>>({});
+  const [codeInputValue, setCodeInputValue] = useState('');
+  
+  const { data: form, isLoading: isFormLoading, error: formError } = trpc.form.getFormForSubmission.useQuery(
+    { formId, secureCode: secureCode || undefined },
+    { retry: false, refetchOnWindowFocus: false }
+  );
+
+  const { data: checkSubmission, isLoading: isCheckLoading } = trpc.submission.checkUserSubmission.useQuery(
+    { formId },
+    { enabled: !!user?.id && !!formId }
+  );
+
+  const submitForm = trpc.submission.submitForm.useMutation({
+    onSuccess: () => {
+      utils.submission.checkUserSubmission.invalidate({ formId });
+    },
+    onError: (err) => {
+      toast.error(err.message || 'Failed to submit response');
+    }
+  });
+
+  const utils = trpc.useUtils();
+
+  const isMissingCodeError = formError?.message?.toLowerCase().includes('secure code');
+
+  if (isAuthLoading || isFormLoading || isCheckLoading) {
+    return (
+      <div className="min-h-screen bg-inquest-base flex items-center justify-center">
+        <div className="w-8 h-8 rounded-full border-2 border-inquest-accent border-t-transparent animate-spin" />
+      </div>
+    );
+  }
+
+  // 1. Secure Code Gate
+  if (isMissingCodeError) {
+    return (
+      <div className="min-h-screen bg-inquest-base flex flex-col items-center justify-center px-4">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+          className="w-full max-w-md bg-inquest-surface rounded-3xl p-8 text-center warm-shadow border border-inquest-rule/50"
+        >
+          <div className="mx-auto w-12 h-12 bg-inquest-depth rounded-full flex items-center justify-center mb-6">
+            <Lock className="text-inquest-ink" size={24} />
+          </div>
+          <h2 className="text-2xl font-serif text-inquest-ink mb-2">Private Enquiry</h2>
+          <p className="text-inquest-ink-mid mb-8">This form requires a secure code for access.</p>
+          
+          <form onSubmit={(e) => {
+            e.preventDefault();
+            if(codeInputValue) router.replace(`/forms/${formId}?code=${codeInputValue}`);
+          }}>
+            <input
+              type="text"
+              value={codeInputValue}
+              onChange={(e) => setCodeInputValue(e.target.value.toUpperCase())}
+              placeholder="Enter 6-character code"
+              className="w-full bg-inquest-base border border-inquest-rule focus:border-inquest-accent rounded-xl px-4 py-3 text-center tracking-widest text-lg font-mono text-inquest-ink uppercase mb-4 focus:ring-1 focus:ring-inquest-accent transition-colors"
+              maxLength={6}
+            />
+            <button type="submit" disabled={!codeInputValue} className="w-full py-3 rounded-full bg-inquest-accent text-white font-medium hover:bg-inquest-accent-soft transition-colors disabled:opacity-50 terracotta-glow">
+              Unlock Enquiry
+            </button>
+          </form>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // Generic Error
+  if (formError) {
+    return (
+      <div className="min-h-screen bg-inquest-base flex items-center justify-center px-4">
+        <div className="text-center">
+          <AlertCircle className="mx-auto text-inquest-caution mb-4" size={32} />
+          <h2 className="text-2xl font-serif text-inquest-ink mb-2">Unavailable</h2>
+          <p className="text-inquest-ink-mid">{formError.message}</p>
+        </div>
+      </div>
+    );
+  }
+
+  // 2. Unauthenticated Gate
+  if (!isSignedIn) {
+    return (
+      <div className="min-h-screen bg-inquest-base flex items-center justify-center px-4">
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+          className="w-full max-w-md bg-inquest-surface rounded-3xl p-8 text-center warm-shadow border border-inquest-rule/50"
+        >
+          <h2 className="text-2xl font-serif text-inquest-ink mb-3">Session Required</h2>
+          <p className="text-inquest-ink-mid mb-8 leading-relaxed">
+            You must be logged in to thoughtfully respond to "{form?.title}". We verify identities to maintain a high-quality space for dialogue.
+          </p>
+          <div className="space-y-3">
+            <button onClick={() => router.push(`/login?redirect=/forms/${formId}${secureCode ? `?code=${secureCode}` : ''}`)} className="w-full py-3 rounded-full bg-inquest-accent text-white font-medium hover:bg-inquest-accent-soft transition-colors terracotta-glow">
+              Sign In
+            </button>
+            <button onClick={() => router.push(`/sign-up?redirect=/forms/${formId}${secureCode ? `?code=${secureCode}` : ''}`)} className="w-full py-3 rounded-full bg-transparent border border-inquest-rule text-inquest-ink font-medium hover:bg-inquest-depth/30 transition-colors">
+              Create Account
+            </button>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // 3. Already Submitted View
+  if (checkSubmission?.hasSubmitted || submitForm.isSuccess) {
+    return (
+      <div className="min-h-screen bg-inquest-base flex items-center justify-center px-4">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+          className="w-full max-w-lg bg-inquest-surface rounded-3xl p-10 text-center warm-shadow"
+        >
+          <motion.div 
+            initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', bounce: 0.5 }}
+            className="w-16 h-16 bg-inquest-sage/20 rounded-full flex items-center justify-center mx-auto mb-6 text-inquest-sage"
+          >
+            <CheckCircle2 size={32} />
+          </motion.div>
+          <h2 className="text-3xl font-serif text-inquest-ink mb-4">Response Submitted</h2>
+          <p className="text-inquest-ink-mid text-lg leading-relaxed mb-8">
+            Thank you for taking the time to share your perspective. Your insight has been safely recorded.
+          </p>
+          <Link href="/dashboard" className="inline-block px-8 py-3 rounded-full bg-inquest-ink text-white font-medium hover:bg-inquest-ink-mid transition-colors">
+            Return to Dashboard
+          </Link>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // Form Rendering
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Check required fields
+    for (const field of form!.fields) {
+      if (field.required && !answers[field.id]) {
+        toast.error(`Please answer: ${field.label}`);
+        return;
+      }
+    }
+
+    submitForm.mutate({
+      formId,
+      secureCode: secureCode || undefined,
+      answers: Object.entries(answers).map(([formFieldId, answer]) => ({
+        formFieldId,
+        answer: answer.toString(),
+      }))
+    });
+  };
+
+  return (
+    <div className="min-h-screen bg-inquest-base py-12 px-4 sm:px-6">
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+        className="max-w-2xl mx-auto"
+      >
+        <header className="mb-12 text-center">
+          <h1 className="text-4xl font-serif text-inquest-ink mb-4 tracking-tight">{form?.title}</h1>
+          {form?.description && (
+            <p className="text-lg text-inquest-ink-mid max-w-xl mx-auto">{form.description}</p>
+          )}
+        </header>
+
+        <form onSubmit={handleSubmit} className="space-y-8">
+          {form?.fields.map((field: any, index: number) => (
+            <motion.div 
+              key={field.id}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: index * 0.1 }}
+              className="bg-inquest-surface p-8 rounded-3xl warm-shadow border border-inquest-rule/50"
+            >
+              <label className="block mb-4">
+                <span className="text-xl font-serif text-inquest-ink block mb-1">
+                  {field.label}
+                  {field.required && <span className="text-inquest-accent ml-2">*</span>}
+                </span>
+                {field.placeholder && <span className="text-sm text-inquest-ink-soft">{field.placeholder}</span>}
+              </label>
+
+              {field.type === 'text' && (
+                <input
+                  type="text"
+                  required={field.required}
+                  value={answers[field.id] || ''}
+                  onChange={(e) => setAnswers({ ...answers, [field.id]: e.target.value })}
+                  className="w-full bg-inquest-base border-0 focus:ring-2 focus:ring-inquest-accent rounded-xl px-4 py-3 text-lg text-inquest-ink transition-shadow"
+                />
+              )}
+
+              {field.type === 'textarea' && (
+                <textarea
+                  required={field.required}
+                  value={answers[field.id] || ''}
+                  onChange={(e) => setAnswers({ ...answers, [field.id]: e.target.value })}
+                  className="w-full bg-inquest-base border-0 focus:ring-2 focus:ring-inquest-accent rounded-2xl px-4 py-4 min-h-[120px] resize-none text-lg text-inquest-ink transition-shadow"
+                />
+              )}
+
+              {field.type === 'number' && (
+                <input
+                  type="number"
+                  required={field.required}
+                  value={answers[field.id] || ''}
+                  onChange={(e) => setAnswers({ ...answers, [field.id]: e.target.value })}
+                  className="w-full bg-inquest-base border-0 focus:ring-2 focus:ring-inquest-accent rounded-xl px-4 py-3 text-lg text-inquest-ink transition-shadow"
+                />
+              )}
+
+              {(field.type === 'email' || field.type === 'phone' || field.type === 'date') && (
+                <input
+                  type={field.type}
+                  required={field.required}
+                  value={answers[field.id] || ''}
+                  onChange={(e) => setAnswers({ ...answers, [field.id]: e.target.value })}
+                  className="w-full bg-inquest-base border-0 focus:ring-2 focus:ring-inquest-accent rounded-xl px-4 py-3 text-lg text-inquest-ink transition-shadow"
+                />
+              )}
+
+              {field.type === 'boolean' && (
+                <div className="grid grid-cols-2 gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setAnswers({ ...answers, [field.id]: 'true' })}
+                    className={`py-4 rounded-2xl text-lg font-medium transition-all ${
+                      answers[field.id] === 'true' 
+                        ? 'bg-inquest-accent text-white terracotta-glow border-transparent' 
+                        : 'bg-inquest-base border border-inquest-rule text-inquest-ink hover:border-inquest-accent'
+                    }`}
+                  >
+                    Yes
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAnswers({ ...answers, [field.id]: 'false' })}
+                    className={`py-4 rounded-2xl text-lg font-medium transition-all ${
+                      answers[field.id] === 'false' 
+                        ? 'bg-inquest-ink text-white shadow-lg border-transparent' 
+                        : 'bg-inquest-base border border-inquest-rule text-inquest-ink hover:border-inquest-ink'
+                    }`}
+                  >
+                    No
+                  </button>
+                </div>
+              )}
+
+              {field.type === 'single_select' && (
+                <div className="space-y-3">
+                  {field.validation?.options?.map((opt: string) => (
+                    <label key={opt} className="flex items-center p-4 rounded-2xl bg-inquest-base border border-inquest-rule cursor-pointer hover:border-inquest-accent transition-colors">
+                      <input
+                        type="radio"
+                        name={field.id}
+                        value={opt}
+                        checked={answers[field.id] === opt}
+                        onChange={(e) => setAnswers({ ...answers, [field.id]: e.target.value })}
+                        className="w-5 h-5 text-inquest-accent focus:ring-inquest-accent border-inquest-rule bg-inquest-base"
+                      />
+                      <span className="ml-3 text-lg text-inquest-ink">{opt}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+
+              {field.type === 'multi_select' && (
+                <div className="space-y-3">
+                  {field.validation?.options?.map((opt: string) => {
+                    const currentAnswers = answers[field.id] ? (answers[field.id] as string).split(',') : [];
+                    return (
+                      <label key={opt} className="flex items-center p-4 rounded-2xl bg-inquest-base border border-inquest-rule cursor-pointer hover:border-inquest-accent transition-colors">
+                        <input
+                          type="checkbox"
+                          value={opt}
+                          checked={currentAnswers.includes(opt)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setAnswers({ ...answers, [field.id]: [...currentAnswers, opt].join(',') });
+                            } else {
+                              setAnswers({ ...answers, [field.id]: currentAnswers.filter(a => a !== opt).join(',') });
+                            }
+                          }}
+                          className="w-5 h-5 rounded text-inquest-accent focus:ring-inquest-accent border-inquest-rule bg-inquest-base"
+                        />
+                        <span className="ml-3 text-lg text-inquest-ink">{opt}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </motion.div>
+          ))}
+
+          <div className="pt-6 pb-20">
+            <button
+              type="submit"
+              disabled={submitForm.isPending}
+              className="w-full py-4 rounded-full bg-inquest-accent text-white text-xl font-medium hover:bg-inquest-accent-soft transition-colors terracotta-glow disabled:opacity-50"
+            >
+              {submitForm.isPending ? 'Submitting...' : 'Submit Response'}
+            </button>
+          </div>
+        </form>
+      </motion.div>
+    </div>
+  );
+}

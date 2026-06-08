@@ -1,121 +1,88 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-'use client'
+'use client';
 
-import { useState } from 'react'
-import { useLogin } from '~/hooks/api/auth';
-import { useRouter } from 'next/navigation'
+import { useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { trpc } from '~/trpc/client';
+import { motion } from 'framer-motion';
+import Link from 'next/link';
+import { toast } from 'sonner';
 
 export default function LoginPage() {
- 
   const router = useRouter();
-  const {signInUserWithEmailAndPasswordAsync} = useLogin();
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-  })
+  const searchParams = useSearchParams();
+  const redirectUrl = searchParams.get('redirect') || '/dashboard';
 
-  const [isLoading, setIsLoading] = useState(false)
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
 
-  const handleChange = (e:any) => {
-    const { name, value } = e.target
+  const signIn = trpc.auth.signInUserWithEmailAndPassword.useMutation({
+    onSuccess: () => {
+      toast.success('Welcome back!');
+      router.push(redirectUrl);
+    },
+    onError: (err) => {
+      toast.error(err.message || 'Failed to sign in. Please check your credentials.');
+    },
+  });
 
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }))
-  }
-
-  const handleSubmit = async (e:any) => {
-    e.preventDefault()
-
-    try {
-      setIsLoading(true)
-
-      const {email,password} = formData;
-      const {id} = await signInUserWithEmailAndPasswordAsync({email,password});
-      console.log(id);
-      router.replace('/dashboard')
-
-    } catch (err) {
-      console.error(err)
-    } finally {
-      setIsLoading(false)
-    }
-  }
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    signIn.mutate({ email, password });
+  };
 
   return (
-    <div className="min-h-screen bg-zinc-950 flex items-center justify-center px-4">
-      <div className="w-full max-w-md rounded-2xl border border-zinc-800 bg-zinc-900 p-8 shadow-xl">
-        <h1 className="text-3xl font-bold text-center text-white">
-          Welcome Back
-        </h1>
+    <div className="min-h-screen flex items-center justify-center bg-inquest-base px-4 py-12">
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="w-full max-w-md bg-inquest-surface rounded-[2rem] p-8 md:p-10 warm-shadow"
+      >
+        <div className="mb-8 text-center">
+          <h1 className="text-3xl font-serif text-inquest-ink mb-2">Welcome Back</h1>
+          <p className="text-inquest-ink-soft">Sign in to continue to Inquest.</p>
+        </div>
 
-        <p className="mt-2 mb-8 text-center text-zinc-400">
-          Login to your account
-        </p>
-
-        <form
-          onSubmit={handleSubmit}
-          className="space-y-5"
-        >
-          <div>
-            <label
-              htmlFor="email"
-              className="mb-2 block text-sm font-medium text-zinc-300"
-            >
-              Email
-            </label>
-
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-inquest-ink-mid px-1">Email Address</label>
             <input
-              id="email"
-              name="email"
               type="email"
-              value={formData.email}
-              onChange={handleChange}
-              placeholder="john@example.com"
-              className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-3 text-white placeholder:text-zinc-500 outline-none transition focus:border-blue-500"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full bg-inquest-base border border-inquest-rule focus:border-inquest-accent focus:ring-1 focus:ring-inquest-accent rounded-xl px-4 py-3 text-inquest-ink placeholder-inquest-ink-ghost transition-colors"
+              placeholder="you@example.com"
             />
           </div>
 
-          <div>
-            <label
-              htmlFor="password"
-              className="mb-2 block text-sm font-medium text-zinc-300"
-            >
-              Password
-            </label>
-
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-inquest-ink-mid px-1">Password</label>
             <input
-              id="password"
-              name="password"
               type="password"
-              value={formData.password}
-              onChange={handleChange}
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full bg-inquest-base border border-inquest-rule focus:border-inquest-accent focus:ring-1 focus:ring-inquest-accent rounded-xl px-4 py-3 text-inquest-ink placeholder-inquest-ink-ghost transition-colors"
               placeholder="••••••••"
-              className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-3 text-white placeholder:text-zinc-500 outline-none transition focus:border-blue-500"
             />
           </div>
 
           <button
             type="submit"
-            disabled={isLoading}
-            className="w-full rounded-lg bg-blue-600 py-3 font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={signIn.isPending}
+            className="w-full py-3.5 rounded-full bg-inquest-accent text-white font-medium hover:bg-inquest-accent-soft transition terracotta-glow disabled:opacity-70"
           >
-            {isLoading ? 'Logging In...' : 'Login'}
+            {signIn.isPending ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
 
-        <p className="mt-6 text-center text-sm text-zinc-400">
-          Don&apost have an account?{' '}
-          <button
-            onClick={() => router.push('/sign-up')}
-            type="button"
-            className="text-blue-400 hover:text-blue-300"
-          >
-            Sign Up
-          </button>
-        </p>
-      </div>
+        <div className="mt-8 text-center text-inquest-ink-soft text-sm">
+          Don't have an account?{' '}
+          <Link href={`/sign-up?redirect=${encodeURIComponent(redirectUrl)}`} className="text-inquest-accent hover:underline font-medium">
+            Create one
+          </Link>
+        </div>
+      </motion.div>
     </div>
-  )
+  );
 }

@@ -1,20 +1,23 @@
 import type { Metadata } from "next";
-import localFont from "next/font/local";
+import { Inter, Playfair_Display } from "next/font/google";
 import { GlobalProviders } from "~/providers/global";
 import './globals.css'
 
-const geistSans = localFont({
-  src: "./fonts/GeistVF.woff",
-  variable: "--font-geist-sans",
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+  display: "swap",
 });
-const geistMono = localFont({
-  src: "./fonts/GeistMonoVF.woff",
-  variable: "--font-geist-mono",
+
+const playfair = Playfair_Display({
+  subsets: ["latin"],
+  variable: "--font-playfair",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "Streamyst",
-  description: "Media Forwarding",
+  title: "Inquest | Thoughtful Enquiries",
+  description: "Ask questions that reach the people who know.",
 };
 
 export default function RootLayout({
@@ -23,8 +26,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
-      <body className={`${geistSans.variable} ${geistMono.variable}`}>
+    <html lang="en">
+      <body className={`${inter.variable} ${playfair.variable} antialiased`}>
         <GlobalProviders>{children}</GlobalProviders>
       </body>
     </html>

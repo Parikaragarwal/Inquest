@@ -1,128 +1,102 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-'use client'
+'use client';
 
-import { useState } from 'react'
-import { useSignUp } from '~/hooks/api/auth'
-import { useRouter } from 'next/navigation'
-
+import { useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { trpc } from '~/trpc/client';
+import { motion } from 'framer-motion';
+import Link from 'next/link';
+import { toast } from 'sonner';
 
 export default function SignUpPage() {
-  const {createUserWithEmailAndPasswordAsync} = useSignUp();
-   const router = useRouter()
-  const [formData, setFormData] = useState({
-    fullName: '',
-    email: '',
-    password: '',
-  })
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectUrl = searchParams.get('redirect') || '/dashboard';
 
-  const handleChange = (e:any) => {
-    const { name, value } = e.target
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
 
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }))
-  }
+  const signUp = trpc.auth.createUserWithEmailAndPassword.useMutation({
+    onSuccess: () => {
+      toast.success('Account created successfully!');
+      router.push(redirectUrl);
+    },
+    onError: (err) => {
+      toast.error(err.message || 'Failed to create account.');
+    },
+  });
 
-  const handleSubmit = async (e:any) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const {email,fullName,password} = formData;
-    const {id}=await createUserWithEmailAndPasswordAsync({email,fullName,password});
-    console.log(`User created with Id ${id}`);
-    router.replace('/dashboard')
-  }
+    signUp.mutate({ fullName: name, email, password });
+  };
 
   return (
-    <div className="min-h-screen bg-zinc-950 flex items-center justify-center px-4">
-      <div className="w-full max-w-md rounded-2xl border border-zinc-800 bg-zinc-900 p-8 shadow-xl">
-        <h1 className="text-3xl font-bold text-white text-center">
-          Create Account
-        </h1>
+    <div className="min-h-screen flex items-center justify-center bg-inquest-base px-4 py-12">
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="w-full max-w-md bg-inquest-surface rounded-[2rem] p-8 md:p-10 warm-shadow"
+      >
+        <div className="mb-8 text-center">
+          <h1 className="text-3xl font-serif text-inquest-ink mb-2">Create Account</h1>
+          <p className="text-inquest-ink-soft">Join Inquest to start gathering insights.</p>
+        </div>
 
-        <p className="text-zinc-400 text-center mt-2 mb-8">
-          Sign up to get started
-        </p>
-
-        <form
-          onSubmit={handleSubmit}
-          className="space-y-5"
-        >
-          <div>
-            <label
-              htmlFor="fullName"
-              className="block text-sm font-medium text-zinc-300 mb-2"
-            >
-              Full Name
-            </label>
-
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-inquest-ink-mid px-1">Full Name</label>
             <input
-              id="fullName"
-              name="fullName"
               type="text"
-              value={formData.fullName}
-              onChange={handleChange}
-              placeholder="John Doe"
-              className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-3 text-white placeholder:text-zinc-500 outline-none transition focus:border-blue-500"
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full bg-inquest-base border border-inquest-rule focus:border-inquest-accent focus:ring-1 focus:ring-inquest-accent rounded-xl px-4 py-3 text-inquest-ink placeholder-inquest-ink-ghost transition-colors"
+              placeholder="Jane Doe"
             />
           </div>
 
-          <div>
-            <label
-              htmlFor="email"
-              className="block text-sm font-medium text-zinc-300 mb-2"
-            >
-              Email
-            </label>
-
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-inquest-ink-mid px-1">Email Address</label>
             <input
-              id="email"
-              name="email"
               type="email"
-              value={formData.email}
-              onChange={handleChange}
-              placeholder="john@example.com"
-              className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-3 text-white placeholder:text-zinc-500 outline-none transition focus:border-blue-500"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full bg-inquest-base border border-inquest-rule focus:border-inquest-accent focus:ring-1 focus:ring-inquest-accent rounded-xl px-4 py-3 text-inquest-ink placeholder-inquest-ink-ghost transition-colors"
+              placeholder="you@example.com"
             />
           </div>
 
-          <div>
-            <label
-              htmlFor="password"
-              className="block text-sm font-medium text-zinc-300 mb-2"
-            >
-              Password
-            </label>
-
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-inquest-ink-mid px-1">Password</label>
             <input
-              id="password"
-              name="password"
               type="password"
-              value={formData.password}
-              onChange={handleChange}
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full bg-inquest-base border border-inquest-rule focus:border-inquest-accent focus:ring-1 focus:ring-inquest-accent rounded-xl px-4 py-3 text-inquest-ink placeholder-inquest-ink-ghost transition-colors"
               placeholder="••••••••"
-              className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-3 text-white placeholder:text-zinc-500 outline-none transition focus:border-blue-500"
+              minLength={6}
             />
           </div>
 
           <button
             type="submit"
-            className="w-full rounded-lg bg-blue-600 py-3 font-medium text-white transition hover:bg-blue-700 cursor-pointer"
+            disabled={signUp.isPending}
+            className="w-full py-3.5 rounded-full bg-inquest-accent text-white font-medium hover:bg-inquest-accent-soft transition terracotta-glow disabled:opacity-70"
           >
-            Sign Up
+            {signUp.isPending ? 'Creating account...' : 'Create Account'}
           </button>
         </form>
 
-        <p className="mt-6 text-center text-sm text-zinc-400">
+        <div className="mt-8 text-center text-inquest-ink-soft text-sm">
           Already have an account?{' '}
-          <button
-            onClick={() => router.push('/login')}
-            type="button"
-            className="text-blue-400 hover:text-blue-300"
-          >
-            Login
-          </button>
-        </p>
-      </div>
+          <Link href={`/login?redirect=${encodeURIComponent(redirectUrl)}`} className="text-inquest-accent hover:underline font-medium">
+            Sign in
+          </Link>
+        </div>
+      </motion.div>
     </div>
-  )
+  );
 }
