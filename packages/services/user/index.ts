@@ -86,8 +86,7 @@ class UserService {
     }
 
     const hash = await this.generateHash(existingUser.salt,password);
-    console.log(hash);
-    console.log(existingUser.password);
+
     if(hash!==existingUser.password){
       throw new Error('Invalid Username or Password');
     }

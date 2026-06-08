@@ -4,6 +4,8 @@ CREATE TABLE "users" (
 	"email" varchar(255) NOT NULL,
 	"email_verified" boolean DEFAULT false,
 	"profile_image_url" text,
+	"salt" text,
+	"password" text,
 	"created_at" timestamp DEFAULT now(),
 	"updated_at" timestamp,
 	CONSTRAINT "users_email_unique" UNIQUE("email")

@@ -4,6 +4,7 @@ export interface TRPCContext {
     createCookie: ReturnType<typeof createCookieFactory>
     getCookie: ReturnType<typeof getCookieFactory>
     clearCookie: ReturnType<typeof clearCookieFactory>
+    user?: { id: string }
 }
 
 export async function createContext({
