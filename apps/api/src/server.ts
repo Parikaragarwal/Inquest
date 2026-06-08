@@ -7,7 +7,7 @@ import * as trpcExpress from "@trpc/server/adapters/express";
 import { generateOpenApiDocument, createOpenApiExpressMiddleware } from "trpc-to-openapi";
 import { apiReference } from "@scalar/express-api-reference";
 
-import { serverRouter, createContext } from "@repo/trpc/server";
+import { serverRouter, createContext, userService, createCookieFactory } from "@repo/trpc/server";
 
 import { env } from "./env";
 
@@ -44,6 +44,43 @@ app.get("/openapi.json", (req, res) => {
 
 logger.debug(`docs: ${env.BASE_URL}/docs`);
 app.use("/docs", apiReference({ url: "/openapi.json" }));
+
+app.get("/auth/google", (req, res) => {
+  try {
+    const url = userService.generateGoogleOAuthUrl();
+    res.redirect(url);
+  } catch (error: any) {
+    logger.error("Google Auth Error: " + error.message);
+    res.redirect("/login?error=google_auth_failed");
+  }
+});
+
+app.get("/auth/google/callback", async (req, res) => {
+  const code = req.query.code as string;
+  if (!code) {
+    return res.redirect("/login?error=invalid_code");
+  }
+
+  try {
+    const { token } = await userService.signInWithGoogleAuthorizationCode({ code });
+    
+    const createCookie = createCookieFactory(res);
+    // Mimic the same options as defaultCookieOption in utils/cookie.ts
+    const YEAR = 12 * 20 * 24 * 60 * 60 * 1000;
+    createCookie('authentication-token', token, {
+      path: '/',
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: YEAR
+    });
+
+    res.redirect("http://localhost:3000/dashboard");
+  } catch (error: any) {
+    logger.error("Google Callback Error: " + error.message);
+    res.redirect("http://localhost:3000/login?error=google_auth_failed");
+  }
+});
 
 app.use(
   "/api",

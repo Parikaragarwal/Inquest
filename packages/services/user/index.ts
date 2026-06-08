@@ -107,6 +107,108 @@ class UserService {
       ...userInfo
     };
   }
+
+  // ─── Google OAuth ────────────────────────────────────
+
+  public generateGoogleOAuthUrl() {
+    const { googleOAuth2Client } = require('../clients/google-oauth');
+    
+    // Fallback if client is missing credentials (e.g. env vars not set)
+    if (!env.GOOGLE_OAUTH_CLIENT_ID) {
+      throw new Error("Google OAuth is not configured");
+    }
+
+    return googleOAuth2Client.generateAuthUrl({
+      access_type: 'offline',
+      scope: ['openid', 'email', 'profile'],
+      response_type: 'code',
+      prompt: 'consent'
+    });
+  }
+
+  public async signInWithGoogleAuthorizationCode(payload: { code: string }) {
+    const { googleOAuth2Client } = require('../clients/google-oauth');
+
+    if (!env.GOOGLE_OAUTH_CLIENT_ID) {
+      throw new Error("Google OAuth is not configured");
+    }
+
+    // Exchange code for tokens
+    const { tokens } = await googleOAuth2Client.getToken(payload.code);
+    
+    if (!tokens.id_token) {
+      throw new Error("No ID token received from Google");
+    }
+
+    // Verify ID token
+    const ticket = await googleOAuth2Client.verifyIdToken({
+      idToken: tokens.id_token,
+      audience: env.GOOGLE_OAUTH_CLIENT_ID,
+    });
+
+    const payloadProfile = ticket.getPayload();
+    if (!payloadProfile || !payloadProfile.email) {
+      throw new Error("Invalid Google profile payload");
+    }
+
+    const user = await this.findOrCreateGoogleUser({
+      email: payloadProfile.email,
+      name: payloadProfile.name || payloadProfile.email.split('@')[0] || 'User',
+      picture: payloadProfile.picture || null,
+      email_verified: payloadProfile.email_verified || false,
+    });
+
+    const { token } = await this.generateUserToken({ id: user.id });
+
+    return {
+      id: user.id,
+      token
+    };
+  }
+
+  private async findOrCreateGoogleUser(profile: {
+    email: string;
+    name: string;
+    picture: string | null;
+    email_verified: boolean;
+  }) {
+    const existingUser = await this.getUserByEmail(profile.email);
+
+    if (existingUser) {
+      // Set emailVerified = true, update avatar if empty
+      const updateData: any = { emailVerified: true };
+      if (!existingUser.profileImageUrl && profile.picture) {
+        updateData.profileImageUrl = profile.picture;
+      }
+      
+      await db.update(usersTable)
+        .set(updateData)
+        .where(eq(usersTable.id, existingUser.id));
+
+      return existingUser;
+    } else {
+      // Create new user with null password/salt
+      const userInsertResult = await db.insert(usersTable).values({
+        email: profile.email,
+        fullName: profile.name,
+        profileImageUrl: profile.picture,
+        emailVerified: true,
+        password: null,
+        salt: null,
+      }).returning({
+        id: usersTable.id
+      });
+
+      if (!userInsertResult || userInsertResult.length === 0 || !userInsertResult[0]?.id) {
+        throw new Error('Error creating a user from Google profile');
+      }
+
+      return {
+        id: userInsertResult[0].id
+      };
+    }
+  }
+
 }
 
 export default UserService;
