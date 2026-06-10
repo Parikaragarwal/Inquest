@@ -75,6 +75,7 @@ export const emailConfigSchema = z
 
 export const phoneConfigSchema = z
   .object({
+    countryCode: z.string().optional(), // e.g. "+1", "+91"
     minLength: z.number().int().min(0).optional(),
     maxLength: z.number().int().min(0).optional(),
     pattern: safeRegex.optional(),
@@ -297,21 +298,26 @@ export function validateAnswer(
     }
 
     case "phone": {
+      // Answer may be stored as "countryCode|digits" e.g. "+91|9876543210"
+      const phoneParts = answer.includes("|") ? answer.split("|") : [null, answer];
+      const digits = phoneParts[1] ?? answer;
+
       if (config) {
         const minLength = config.minLength as number | undefined;
         const maxLength = config.maxLength as number | undefined;
         const pattern = config.pattern as string | undefined;
 
-        if (minLength !== undefined && answer.length < minLength) {
+        if (minLength !== undefined && digits.length < minLength) {
           throw new Error(
-            `Field '${field.label}' must be at least ${minLength} characters`
+            `Field '${field.label}' must be at least ${minLength} digits`
           );
         }
-        if (maxLength !== undefined && answer.length > maxLength) {
+        if (maxLength !== undefined && digits.length > maxLength) {
           throw new Error(
-            `Field '${field.label}' must be at most ${maxLength} characters`
+            `Field '${field.label}' must be at most ${maxLength} digits`
           );
         }
+        // Pattern tested against full answer so regexes can match the dial prefix too
         if (pattern !== undefined && !new RegExp(pattern).test(answer)) {
           throw new Error(
             `Field '${field.label}' does not match the required pattern`

@@ -209,6 +209,16 @@ class UserService {
     }
   }
 
+  public async updateProfile(payload: { userId: string; fullName: string }) {
+    if (!payload.fullName || payload.fullName.trim().length === 0) {
+      throw new Error('Full name cannot be empty');
+    }
+    await db.update(usersTable)
+      .set({ fullName: payload.fullName.trim() })
+      .where(eq(usersTable.id, payload.userId));
+    return this.getUserInfoById(payload.userId);
+  }
+
 }
 
 export default UserService;

@@ -1,6 +1,6 @@
 import { signInUserWithEmailAndPasswordInput } from "@repo/services/user/model";
 import { userService } from "../../services";
-import { publicProcedure, router } from "../../trpc";
+import { publicProcedure, authenticatedProcedure, router } from "../../trpc";
 import { getAuthenticationCookie, setAuthenticatonCookie } from "../../utils/cookie";
 import { generatePath } from "../../utils/path-generator";
 import { createUserWithEmailAndPasswordInputModel
@@ -8,7 +8,9 @@ import { createUserWithEmailAndPasswordInputModel
    getLoggedInUserInfoInputModel,
    getLoggedInUserInfoOutputModel,
    signInUserWithEmailAndPasswordInputModel, 
-   signInUserWithEmailAndPasswordOutputModel} from "./model";
+   signInUserWithEmailAndPasswordOutputModel,
+   updateProfileInputModel,
+   updateProfileOutputModel} from "./model";
 
 const TAGS = ["Authentication"];
 const getPath = generatePath("/authentication");
@@ -73,6 +75,24 @@ export const authRouter = router({
       id,
       email,fullName,profileImageUrl
     }
+  }),
+
+  updateProfile: authenticatedProcedure.meta({
+    openapi:{
+      method:'PATCH',
+      path: getPath('/updateProfile'),
+      tags: TAGS
+    }
   })
+  .input(updateProfileInputModel)
+  .output(updateProfileOutputModel)
+  .mutation(async ({input, ctx})=>{
+    const result = await userService.updateProfile({
+      userId: ctx.user!.id,
+      fullName: input.fullName,
+    });
+    if (!result) throw new Error('Profile update failed');
+    return result;
+  }),
 
 });

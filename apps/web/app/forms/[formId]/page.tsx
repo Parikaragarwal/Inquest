@@ -9,22 +9,52 @@ import { toast } from 'sonner';
 import { Lock, CheckCircle2, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 
+// Common dial codes for phone fields
+const COUNTRY_CODES = [
+  { label: 'None', value: '' },
+  { label: '+1 (US/CA)', value: '+1' },
+  { label: '+44 (UK)', value: '+44' },
+  { label: '+91 (India)', value: '+91' },
+  { label: '+61 (AU)', value: '+61' },
+  { label: '+49 (DE)', value: '+49' },
+  { label: '+33 (FR)', value: '+33' },
+  { label: '+81 (JP)', value: '+81' },
+  { label: '+86 (CN)', value: '+86' },
+  { label: '+55 (BR)', value: '+55' },
+  { label: '+7 (RU)', value: '+7' },
+  { label: '+34 (ES)', value: '+34' },
+  { label: '+39 (IT)', value: '+39' },
+  { label: '+82 (KR)', value: '+82' },
+  { label: '+65 (SG)', value: '+65' },
+  { label: '+971 (UAE)', value: '+971' },
+  { label: '+966 (SA)', value: '+966' },
+  { label: '+20 (EG)', value: '+20' },
+  { label: '+27 (ZA)', value: '+27' },
+  { label: '+52 (MX)', value: '+52' },
+];
+
 export default function PublicFormSubmissionPage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const router = useRouter();
-  
+
   const formId = params?.formId as string;
   const secureCode = searchParams.get('code');
 
   const { user, isSignedIn, isLoading: isAuthLoading } = useGetuser();
-  const [answers, setAnswers] = useState<Record<string, any>>({});
+  // answers[fieldId] = string (stringified as needed)
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  // separate state for multi_select (arrays) and phone (country code)
+  const [multiSelectAnswers, setMultiSelectAnswers] = useState<Record<string, string[]>>({});
+  const [phoneCountryCodes, setPhoneCountryCodes] = useState<Record<string, string>>({});
   const [codeInputValue, setCodeInputValue] = useState('');
-  
+
   const { data: form, isLoading: isFormLoading, error: formError } = trpc.form.getFormForSubmission.useQuery(
     { formId, secureCode: secureCode || undefined },
     { retry: false, refetchOnWindowFocus: false }
   );
+
+  const utils = trpc.useUtils();
 
   const { data: checkSubmission, isLoading: isCheckLoading } = trpc.submission.checkUserSubmission.useQuery(
     { formId },
@@ -40,8 +70,6 @@ export default function PublicFormSubmissionPage() {
     }
   });
 
-  const utils = trpc.useUtils();
-
   const isMissingCodeError = formError?.message?.toLowerCase().includes('secure code');
 
   if (isAuthLoading || isFormLoading || isCheckLoading) {
@@ -56,7 +84,7 @@ export default function PublicFormSubmissionPage() {
   if (isMissingCodeError) {
     return (
       <div className="min-h-screen bg-inquest-base flex flex-col items-center justify-center px-4">
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
           className="w-full max-w-md bg-inquest-surface rounded-3xl p-8 text-center warm-shadow border border-inquest-rule/50"
         >
@@ -65,10 +93,10 @@ export default function PublicFormSubmissionPage() {
           </div>
           <h2 className="text-2xl font-serif text-inquest-ink mb-2">Private Enquiry</h2>
           <p className="text-inquest-ink-mid mb-8">This form requires a secure code for access.</p>
-          
+
           <form onSubmit={(e) => {
             e.preventDefault();
-            if(codeInputValue) router.replace(`/forms/${formId}?code=${codeInputValue}`);
+            if (codeInputValue) router.replace(`/forms/${formId}?code=${codeInputValue}`);
           }}>
             <input
               type="text"
@@ -104,19 +132,21 @@ export default function PublicFormSubmissionPage() {
   if (!isSignedIn) {
     return (
       <div className="min-h-screen bg-inquest-base flex items-center justify-center px-4">
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
           className="w-full max-w-md bg-inquest-surface rounded-3xl p-8 text-center warm-shadow border border-inquest-rule/50"
         >
           <h2 className="text-2xl font-serif text-inquest-ink mb-3">Session Required</h2>
           <p className="text-inquest-ink-mid mb-8 leading-relaxed">
-            You must be logged in to thoughtfully respond to "{form?.title}". We verify identities to maintain a high-quality space for dialogue.
+            You must be logged in to thoughtfully respond to &ldquo;{form?.title}&rdquo;. We verify identities to maintain a high-quality space for dialogue.
           </p>
           <div className="space-y-3">
-            <button onClick={() => router.push(`/login?redirect=/forms/${formId}${secureCode ? `?code=${secureCode}` : ''}`)} className="w-full py-3 rounded-full bg-inquest-accent text-white font-medium hover:bg-inquest-accent-soft transition-colors terracotta-glow">
+            <button onClick={() => router.push(`/login?redirect=/forms/${formId}${secureCode ? `?code=${secureCode}` : ''}`)}
+              className="w-full py-3 rounded-full bg-inquest-accent text-white font-medium hover:bg-inquest-accent-soft transition-colors terracotta-glow">
               Sign In
             </button>
-            <button onClick={() => router.push(`/sign-up?redirect=/forms/${formId}${secureCode ? `?code=${secureCode}` : ''}`)} className="w-full py-3 rounded-full bg-transparent border border-inquest-rule text-inquest-ink font-medium hover:bg-inquest-depth/30 transition-colors">
+            <button onClick={() => router.push(`/sign-up?redirect=/forms/${formId}${secureCode ? `?code=${secureCode}` : ''}`)}
+              className="w-full py-3 rounded-full bg-transparent border border-inquest-rule text-inquest-ink font-medium hover:bg-inquest-depth/30 transition-colors">
               Create Account
             </button>
           </div>
@@ -125,15 +155,15 @@ export default function PublicFormSubmissionPage() {
     );
   }
 
-  // 3. Already Submitted View
+  // 3. Already Submitted
   if (checkSubmission?.hasSubmitted || submitForm.isSuccess) {
     return (
       <div className="min-h-screen bg-inquest-base flex items-center justify-center px-4">
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
           className="w-full max-w-lg bg-inquest-surface rounded-3xl p-10 text-center warm-shadow"
         >
-          <motion.div 
+          <motion.div
             initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', bounce: 0.5 }}
             className="w-16 h-16 bg-inquest-sage/20 rounded-full flex items-center justify-center mx-auto mb-6 text-inquest-sage"
           >
@@ -151,34 +181,62 @@ export default function PublicFormSubmissionPage() {
     );
   }
 
-  // Form Rendering
+  // Build submit payload
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Check required fields
-    for (const field of form!.fields) {
-      if (field.required && !answers[field.id]) {
-        toast.error(`Please answer: ${field.label}`);
-        return;
+
+    const payload: { formFieldId: string; answer: string }[] = [];
+
+    for (const field of form!.fields as any[]) {
+      const fid = field.id as string;
+      let answer: string;
+
+      if (field.type === 'multi_select') {
+        const selected = multiSelectAnswers[fid] || [];
+        if (field.required && selected.length === 0) {
+          toast.error(`Please answer: ${field.label}`);
+          return;
+        }
+        // Backend expects JSON-stringified array
+        answer = JSON.stringify(selected);
+      } else if (field.type === 'phone') {
+        const digits = answers[fid] || '';
+        if (field.required && !digits) {
+          toast.error(`Please answer: ${field.label}`);
+          return;
+        }
+        const countryCode = phoneCountryCodes[fid] || field.validation?.countryCode || '';
+        answer = countryCode ? `${countryCode}|${digits}` : digits;
+      } else {
+        answer = answers[fid] || '';
+        if (field.required && !answer) {
+          toast.error(`Please answer: ${field.label}`);
+          return;
+        }
       }
+
+      payload.push({ formFieldId: fid, answer });
     }
 
-    submitForm.mutate({
-      formId,
-      secureCode: secureCode || undefined,
-      answers: Object.entries(answers).map(([formFieldId, answer]) => ({
-        formFieldId,
-        answer: answer.toString(),
-      }))
+    submitForm.mutate({ formId, secureCode: secureCode || undefined, answers: payload });
+  };
+
+  const setAnswer = (fieldId: string, value: string) =>
+    setAnswers((prev) => ({ ...prev, [fieldId]: value }));
+
+  const toggleMultiSelect = (fieldId: string, opt: string) => {
+    setMultiSelectAnswers((prev) => {
+      const current = prev[fieldId] || [];
+      const next = current.includes(opt)
+        ? current.filter((v) => v !== opt)
+        : [...current, opt];
+      return { ...prev, [fieldId]: next };
     });
   };
 
   return (
     <div className="min-h-screen bg-inquest-base py-12 px-4 sm:px-6">
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-        className="max-w-2xl mx-auto"
-      >
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-2xl mx-auto">
         <header className="mb-12 text-center">
           <h1 className="text-4xl font-serif text-inquest-ink mb-4 tracking-tight">{form?.title}</h1>
           {form?.description && (
@@ -187,15 +245,15 @@ export default function PublicFormSubmissionPage() {
         </header>
 
         <form onSubmit={handleSubmit} className="space-y-8">
-          {form?.fields.map((field: any, index: number) => (
-            <motion.div 
+          {(form?.fields as any[] | undefined)?.map((field: any, index: number) => (
+            <motion.div
               key={field.id}
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: index * 0.1 }}
-              className="bg-inquest-surface p-8 rounded-3xl warm-shadow border border-inquest-rule/50"
+              transition={{ delay: index * 0.08 }}
+              className="bg-inquest-surface p-6 sm:p-8 rounded-3xl warm-shadow border border-inquest-rule/50"
             >
-              <label className="block mb-4">
+              <label className="block mb-5">
                 <span className="text-xl font-serif text-inquest-ink block mb-1">
                   {field.label}
                   {field.required && <span className="text-inquest-accent ml-2">*</span>}
@@ -203,82 +261,143 @@ export default function PublicFormSubmissionPage() {
                 {field.placeholder && <span className="text-sm text-inquest-ink-soft">{field.placeholder}</span>}
               </label>
 
+              {/* SHORT TEXT */}
               {field.type === 'text' && (
-                <input
-                  type="text"
-                  required={field.required}
-                  value={answers[field.id] || ''}
-                  onChange={(e) => setAnswers({ ...answers, [field.id]: e.target.value })}
-                  className="w-full bg-inquest-base border-0 focus:ring-2 focus:ring-inquest-accent rounded-xl px-4 py-3 text-lg text-inquest-ink transition-shadow"
-                />
-              )}
-
-              {field.type === 'textarea' && (
-                <textarea
-                  required={field.required}
-                  value={answers[field.id] || ''}
-                  onChange={(e) => setAnswers({ ...answers, [field.id]: e.target.value })}
-                  className="w-full bg-inquest-base border-0 focus:ring-2 focus:ring-inquest-accent rounded-2xl px-4 py-4 min-h-[120px] resize-none text-lg text-inquest-ink transition-shadow"
-                />
-              )}
-
-              {field.type === 'number' && (
-                <input
-                  type="number"
-                  required={field.required}
-                  value={answers[field.id] || ''}
-                  onChange={(e) => setAnswers({ ...answers, [field.id]: e.target.value })}
-                  className="w-full bg-inquest-base border-0 focus:ring-2 focus:ring-inquest-accent rounded-xl px-4 py-3 text-lg text-inquest-ink transition-shadow"
-                />
-              )}
-
-              {(field.type === 'email' || field.type === 'phone' || field.type === 'date') && (
-                <input
-                  type={field.type}
-                  required={field.required}
-                  value={answers[field.id] || ''}
-                  onChange={(e) => setAnswers({ ...answers, [field.id]: e.target.value })}
-                  className="w-full bg-inquest-base border-0 focus:ring-2 focus:ring-inquest-accent rounded-xl px-4 py-3 text-lg text-inquest-ink transition-shadow"
-                />
-              )}
-
-              {field.type === 'boolean' && (
-                <div className="grid grid-cols-2 gap-4">
-                  <button
-                    type="button"
-                    onClick={() => setAnswers({ ...answers, [field.id]: 'true' })}
-                    className={`py-4 rounded-2xl text-lg font-medium transition-all ${
-                      answers[field.id] === 'true' 
-                        ? 'bg-inquest-accent text-white terracotta-glow border-transparent' 
-                        : 'bg-inquest-base border border-inquest-rule text-inquest-ink hover:border-inquest-accent'
-                    }`}
-                  >
-                    Yes
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setAnswers({ ...answers, [field.id]: 'false' })}
-                    className={`py-4 rounded-2xl text-lg font-medium transition-all ${
-                      answers[field.id] === 'false' 
-                        ? 'bg-inquest-ink text-white shadow-lg border-transparent' 
-                        : 'bg-inquest-base border border-inquest-rule text-inquest-ink hover:border-inquest-ink'
-                    }`}
-                  >
-                    No
-                  </button>
+                <div>
+                  <input
+                    type="text"
+                    required={field.required}
+                    value={answers[field.id] || ''}
+                    onChange={(e) => setAnswer(field.id, e.target.value)}
+                    minLength={field.validation?.minLength}
+                    maxLength={field.validation?.maxLength}
+                    pattern={field.validation?.pattern}
+                    className="w-full bg-inquest-base border border-inquest-rule focus:border-inquest-accent focus:ring-2 focus:ring-inquest-accent/20 rounded-xl px-4 py-3 text-lg text-inquest-ink transition"
+                  />
+                  <ValidationHints validation={field.validation} type="text" />
                 </div>
               )}
 
+              {/* LONG TEXT */}
+              {field.type === 'textarea' && (
+                <div>
+                  <textarea
+                    required={field.required}
+                    value={answers[field.id] || ''}
+                    onChange={(e) => setAnswer(field.id, e.target.value)}
+                    minLength={field.validation?.minLength}
+                    maxLength={field.validation?.maxLength}
+                    className="w-full bg-inquest-base border border-inquest-rule focus:border-inquest-accent focus:ring-2 focus:ring-inquest-accent/20 rounded-2xl px-4 py-4 min-h-[120px] resize-none text-lg text-inquest-ink transition"
+                  />
+                  <ValidationHints validation={field.validation} type="text" />
+                </div>
+              )}
+
+              {/* NUMBER */}
+              {field.type === 'number' && (
+                <div>
+                  <input
+                    type="number"
+                    required={field.required}
+                    value={answers[field.id] || ''}
+                    onChange={(e) => setAnswer(field.id, e.target.value)}
+                    min={field.validation?.min}
+                    max={field.validation?.max}
+                    className="w-full bg-inquest-base border border-inquest-rule focus:border-inquest-accent focus:ring-2 focus:ring-inquest-accent/20 rounded-xl px-4 py-3 text-lg text-inquest-ink transition"
+                  />
+                  <ValidationHints validation={field.validation} type="number" />
+                </div>
+              )}
+
+              {/* EMAIL */}
+              {field.type === 'email' && (
+                <input
+                  type="email"
+                  required={field.required}
+                  value={answers[field.id] || ''}
+                  onChange={(e) => setAnswer(field.id, e.target.value)}
+                  className="w-full bg-inquest-base border border-inquest-rule focus:border-inquest-accent focus:ring-2 focus:ring-inquest-accent/20 rounded-xl px-4 py-3 text-lg text-inquest-ink transition"
+                />
+              )}
+
+              {/* PHONE — country code prefix selector */}
+              {field.type === 'phone' && (
+                <div>
+                  <div className="flex gap-2">
+                    <select
+                      value={phoneCountryCodes[field.id] || field.validation?.countryCode || ''}
+                      onChange={(e) => setPhoneCountryCodes((p) => ({ ...p, [field.id]: e.target.value }))}
+                      className="bg-inquest-base border border-inquest-rule rounded-xl px-3 py-3 text-inquest-ink text-sm shrink-0"
+                    >
+                      {COUNTRY_CODES.map((c) => (
+                        <option key={c.value} value={c.value}>{c.label}</option>
+                      ))}
+                    </select>
+                    <input
+                      type="tel"
+                      required={field.required}
+                      value={answers[field.id] || ''}
+                      onChange={(e) => setAnswer(field.id, e.target.value)}
+                      placeholder="Phone number"
+                      className="flex-1 bg-inquest-base border border-inquest-rule focus:border-inquest-accent focus:ring-2 focus:ring-inquest-accent/20 rounded-xl px-4 py-3 text-lg text-inquest-ink transition"
+                    />
+                  </div>
+                  <ValidationHints validation={field.validation} type="phone" />
+                </div>
+              )}
+
+              {/* DATE */}
+              {field.type === 'date' && (
+                <div>
+                  <input
+                    type="date"
+                    required={field.required}
+                    value={answers[field.id] || ''}
+                    onChange={(e) => setAnswer(field.id, e.target.value)}
+                    min={field.validation?.minDate}
+                    max={field.validation?.maxDate}
+                    className="w-full bg-inquest-base border border-inquest-rule focus:border-inquest-accent focus:ring-2 focus:ring-inquest-accent/20 rounded-xl px-4 py-3 text-lg text-inquest-ink transition"
+                  />
+                </div>
+              )}
+
+              {/* BOOLEAN */}
+              {field.type === 'boolean' && (
+                <div className="grid grid-cols-2 gap-4">
+                  {['true', 'false'].map((val) => (
+                    <button
+                      key={val}
+                      type="button"
+                      onClick={() => setAnswer(field.id, val)}
+                      className={`py-4 rounded-2xl text-lg font-medium transition-all ${
+                        answers[field.id] === val
+                          ? val === 'true'
+                            ? 'bg-inquest-accent text-white terracotta-glow border-transparent'
+                            : 'bg-inquest-ink text-white shadow-lg border-transparent'
+                          : 'bg-inquest-base border border-inquest-rule text-inquest-ink hover:border-inquest-accent'
+                      }`}
+                    >
+                      {val === 'true' ? 'Yes' : 'No'}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* SINGLE SELECT */}
               {field.type === 'single_select' && (
                 <div className="space-y-3">
                   {field.validation?.options?.map((opt: string) => (
-                    <label key={opt} className="flex items-center p-4 rounded-2xl bg-inquest-base border border-inquest-rule cursor-pointer hover:border-inquest-accent transition-colors">
+                    <label key={opt} className={`flex items-center p-4 rounded-2xl border cursor-pointer transition-colors ${
+                      answers[field.id] === opt
+                        ? 'bg-inquest-accent-pale border-inquest-accent'
+                        : 'bg-inquest-base border-inquest-rule hover:border-inquest-accent'
+                    }`}>
                       <input
                         type="radio"
                         name={field.id}
                         value={opt}
                         checked={answers[field.id] === opt}
-                        onChange={(e) => setAnswers({ ...answers, [field.id]: e.target.value })}
+                        onChange={(e) => setAnswer(field.id, e.target.value)}
                         className="w-5 h-5 text-inquest-accent focus:ring-inquest-accent border-inquest-rule bg-inquest-base"
                       />
                       <span className="ml-3 text-lg text-inquest-ink">{opt}</span>
@@ -287,29 +406,39 @@ export default function PublicFormSubmissionPage() {
                 </div>
               )}
 
+              {/* MULTI SELECT — stored as JSON array, not comma string */}
               {field.type === 'multi_select' && (
                 <div className="space-y-3">
                   {field.validation?.options?.map((opt: string) => {
-                    const currentAnswers = answers[field.id] ? (answers[field.id] as string).split(',') : [];
+                    const selected = multiSelectAnswers[field.id] || [];
+                    const isChecked = selected.includes(opt);
+                    const maxSel = field.validation?.maxSelections;
+                    const isDisabled = !isChecked && maxSel !== undefined && selected.length >= maxSel;
                     return (
-                      <label key={opt} className="flex items-center p-4 rounded-2xl bg-inquest-base border border-inquest-rule cursor-pointer hover:border-inquest-accent transition-colors">
+                      <label key={opt} className={`flex items-center p-4 rounded-2xl border cursor-pointer transition-colors ${
+                        isChecked
+                          ? 'bg-inquest-accent-pale border-inquest-accent'
+                          : isDisabled
+                            ? 'bg-inquest-base border-inquest-rule opacity-50 cursor-not-allowed'
+                            : 'bg-inquest-base border-inquest-rule hover:border-inquest-accent'
+                      }`}>
                         <input
                           type="checkbox"
                           value={opt}
-                          checked={currentAnswers.includes(opt)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setAnswers({ ...answers, [field.id]: [...currentAnswers, opt].join(',') });
-                            } else {
-                              setAnswers({ ...answers, [field.id]: currentAnswers.filter(a => a !== opt).join(',') });
-                            }
-                          }}
+                          checked={isChecked}
+                          disabled={isDisabled}
+                          onChange={() => toggleMultiSelect(field.id, opt)}
                           className="w-5 h-5 rounded text-inquest-accent focus:ring-inquest-accent border-inquest-rule bg-inquest-base"
                         />
                         <span className="ml-3 text-lg text-inquest-ink">{opt}</span>
                       </label>
                     );
                   })}
+                  {field.validation?.maxSelections && (
+                    <p className="text-xs text-inquest-ink-soft mt-2">
+                      Select up to {field.validation.maxSelections} options
+                    </p>
+                  )}
                 </div>
               )}
             </motion.div>
@@ -327,5 +456,25 @@ export default function PublicFormSubmissionPage() {
         </form>
       </motion.div>
     </div>
+  );
+}
+
+// ─── Inline validation hints component ───────────────────────
+
+function ValidationHints({ validation, type }: { validation: any; type: string }) {
+  if (!validation) return null;
+  const hints: string[] = [];
+  if (type === 'text' || type === 'phone') {
+    if (validation.minLength != null) hints.push(`Min ${validation.minLength} chars`);
+    if (validation.maxLength != null) hints.push(`Max ${validation.maxLength} chars`);
+    if (validation.pattern) hints.push(`Pattern: ${validation.pattern}`);
+  }
+  if (type === 'number') {
+    if (validation.min != null) hints.push(`Min: ${validation.min}`);
+    if (validation.max != null) hints.push(`Max: ${validation.max}`);
+  }
+  if (hints.length === 0) return null;
+  return (
+    <p className="mt-1.5 text-xs text-inquest-ink-ghost">{hints.join(' · ')}</p>
   );
 }
