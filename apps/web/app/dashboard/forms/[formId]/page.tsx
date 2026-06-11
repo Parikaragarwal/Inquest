@@ -9,7 +9,7 @@ import {
   Save, Globe, Lock, ArrowLeft, Trash2,
   Settings, Type, FileText, Hash, CheckSquare,
   Calendar, List, CheckCircle, Mail, Phone,
-  ArrowUp, ArrowDown, Copy, ExternalLink, Users, ClipboardCopy, AlertCircle
+  ArrowUp, ArrowDown, Copy, ExternalLink, Users, ClipboardCopy, AlertCircle, Edit3
 } from 'lucide-react';
 import { useGetuser } from '~/hooks/api/auth';
 import Link from 'next/link';
@@ -116,8 +116,9 @@ export default function FormBuilderPage() {
   const [description, setDescription] = useState('');
   const [fields, setFields] = useState<FormField[]>([]);
   const [selectedFieldIndex, setSelectedFieldIndex] = useState<number | null>(null);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showDescriptionModal, setShowDescriptionModal] = useState(false);
   const [hasDraft, setHasDraft] = useState(false);
 
   // Track whether we loaded from server yet (to avoid overwriting draft on re-renders)
@@ -151,7 +152,7 @@ export default function FormBuilderPage() {
     setTitle(serverForm.title);
     setDescription(serverForm.description || '');
     const sorted = [...serverForm.fields].sort(
-      (a, b) => parseInt(a.orderIndex) - parseInt(b.orderIndex)
+      (a, b) => Number(a.orderIndex) - Number(b.orderIndex)
     );
     setFields(
       sorted.map((f, i) => ({
@@ -161,7 +162,7 @@ export default function FormBuilderPage() {
         required: f.required,
         placeholder: f.placeholder,
         validation: f.validation as FieldValidation | null,
-        orderIndex: i,
+        orderIndex: Number(f.orderIndex),
       }))
     );
     setHasDraft(false);
@@ -289,21 +290,34 @@ export default function FormBuilderPage() {
     toast.success('Share link copied!');
   };
 
-  const addField = (type: string) => {
+  const addField = (type: string, afterIndex?: number) => {
     const defaultValidation: FieldValidation | null =
       type === 'single_select' || type === 'multi_select'
         ? { options: ['Option 1', 'Option 2'] }
         : null;
+
+    let newOrderIndex: number;
+    if (afterIndex === undefined || fields.length === 0) {
+      newOrderIndex = fields.length > 0 ? Number(fields[fields.length - 1]!.orderIndex) + 1 : 0;
+    } else {
+      const current = Number(fields[afterIndex]!.orderIndex);
+      const next = afterIndex + 1 < fields.length ? Number(fields[afterIndex + 1]!.orderIndex) : current + 1;
+      newOrderIndex = (current + next) / 2;
+    }
+
     const newField: FormField = {
       label: 'New Question',
       type,
       required: false,
-      orderIndex: fields.length,
+      orderIndex: newOrderIndex,
       validation: defaultValidation,
     };
-    const newFields = [...fields, newField];
+    const newFields = [...fields];
+    if (afterIndex === undefined) newFields.push(newField);
+    else newFields.splice(afterIndex + 1, 0, newField);
+
     setFields(newFields);
-    setSelectedFieldIndex(newFields.length - 1);
+    setSelectedFieldIndex(afterIndex === undefined ? newFields.length - 1 : afterIndex + 1);
     setShowMobileSidebar(true);
   };
 
@@ -328,12 +342,31 @@ export default function FormBuilderPage() {
     e.stopPropagation();
     if (direction === 'up' && index === 0) return;
     if (direction === 'down' && index === fields.length - 1) return;
-    const newFields = [...fields];
+    
     const target = direction === 'up' ? index - 1 : index + 1;
-    [newFields[index], newFields[target]] = [newFields[target]!, newFields[index]!];
+    const newFields = [...fields];
+
+    let newOrderIndex: number;
+    if (direction === 'up') {
+      if (target === 0) {
+        newOrderIndex = Number(newFields[0]!.orderIndex) - 1;
+      } else {
+        newOrderIndex = (Number(newFields[target - 1]!.orderIndex) + Number(newFields[target]!.orderIndex)) / 2;
+      }
+    } else {
+      if (target === fields.length - 1) {
+        newOrderIndex = Number(newFields[fields.length - 1]!.orderIndex) + 1;
+      } else {
+        newOrderIndex = (Number(newFields[target]!.orderIndex) + Number(newFields[target + 1]!.orderIndex)) / 2;
+      }
+    }
+
+    const fieldToMove = { ...newFields[index]!, orderIndex: newOrderIndex };
+    newFields.splice(index, 1);
+    newFields.splice(target, 0, fieldToMove);
+
     setFields(newFields);
-    if (selectedFieldIndex === index) setSelectedFieldIndex(target);
-    else if (selectedFieldIndex === target) setSelectedFieldIndex(index);
+    setSelectedFieldIndex(target);
   };
 
   // ─── Render ─────────────────────────────────────────────────
@@ -351,9 +384,9 @@ export default function FormBuilderPage() {
   const isPrivate = !!form.secureCode;
 
   return (
-    <div className="h-full flex flex-col -m-12">
+    <div className="h-[calc(100vh-60px)] md:h-[calc(100vh-96px)] flex flex-col -mx-6 -my-6 sm:-mx-8 sm:-my-8 md:-mx-12 md:-my-12 pt-16 md:pt-0 overflow-hidden bg-inquest-base">
       {/* Header */}
-      <header className="bg-inquest-surface border-b border-inquest-rule px-4 sm:px-8 py-4 sm:py-5 shrink-0 sticky top-0 z-10">
+      <header className="bg-inquest-surface border-b border-inquest-rule p-4 sm:p-6 shrink-0 z-10 sticky top-0">
         <div className="flex flex-col sm:flex-row sm:items-center gap-3">
           {/* Left: back + title */}
           <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -381,13 +414,17 @@ export default function FormBuilderPage() {
                   </div>
                 </div>
               </div>
-              <input
-                type="text"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                className="text-sm text-inquest-ink-mid mt-0.5 bg-transparent border-0 focus:ring-0 p-0 w-full placeholder-inquest-ink-ghost"
-                placeholder="Add an optional description..."
-              />
+              <div 
+                onClick={() => setShowDescriptionModal(true)}
+                className="mt-1 cursor-pointer group flex items-start gap-2"
+              >
+                <p className={`text-sm ${description ? 'text-inquest-ink-mid' : 'text-inquest-ink-ghost italic'} line-clamp-2 flex-1`}>
+                  {description || 'Add an optional description...'}
+                </p>
+                <div className="opacity-0 group-hover:opacity-100 transition-opacity p-1 bg-inquest-depth rounded-md text-inquest-ink-soft mt-0.5">
+                  <Edit3 size={12} />
+                </div>
+              </div>
             </div>
           </div>
 
@@ -428,29 +465,13 @@ export default function FormBuilderPage() {
               </button>
             </div>
 
-            <button onClick={copyShareLink} className="p-2 text-inquest-ink-soft hover:text-inquest-ink hover:bg-inquest-depth rounded-full transition-colors" title="Copy share link">
+            <button onClick={copyShareLink} className="p-2 text-inquest-ink-soft hover:text-inquest-ink rounded-full transition-colors" title="Copy share link">
               <Copy size={17} />
             </button>
-            <button onClick={() => window.open(`/forms/${formId}`, '_blank')} className="p-2 text-inquest-ink-soft hover:text-inquest-ink hover:bg-inquest-depth rounded-full transition-colors" title="Preview">
-              <ExternalLink size={17} />
-            </button>
-
-            {/* Responses link */}
-            <Link
-              href={`/dashboard/forms/${formId}/responses`}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-full border border-inquest-rule text-xs font-medium text-inquest-ink-mid hover:bg-inquest-depth/30 transition-colors"
-            >
-              <Users size={15} />
-              <span className="hidden sm:inline">Responses</span>
-              {responseCount > 0 && (
-                <span className="bg-inquest-accent text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold">{responseCount}</span>
-              )}
-            </Link>
-
             <button
               onClick={handleSave}
               disabled={updateForm.isPending}
-              className="flex items-center gap-1.5 bg-inquest-accent text-white px-5 py-2.5 rounded-full font-medium hover:bg-inquest-accent-soft transition-colors terracotta-glow disabled:opacity-50 text-sm"
+              className="flex items-center gap-1.5 bg-inquest-accent text-white px-5 py-2 rounded-full font-medium hover:bg-inquest-accent-soft transition-colors terracotta-glow disabled:opacity-50 text-sm"
             >
               <Save size={15} />
               <span className="hidden sm:inline">{updateForm.isPending ? 'Saving...' : 'Save Changes'}</span>
@@ -468,7 +489,7 @@ export default function FormBuilderPage() {
 
         {/* Draft banner */}
         {hasDraft && (
-          <div className="mt-3 flex items-center gap-3 px-3 py-2 rounded-2xl bg-inquest-sage/20 border border-inquest-sage/40 text-sm">
+          <div className="mt-4 flex items-center gap-3 px-4 py-2 rounded-2xl bg-inquest-sage/20 border border-inquest-sage/40 text-sm">
             <AlertCircle size={16} className="text-inquest-sage shrink-0" />
             <span className="text-inquest-ink-mid flex-1">You have unsaved changes from a previous session.</span>
             <button onClick={discardDraft} className="text-xs text-inquest-ink-soft underline hover:text-inquest-caution">Discard</button>
@@ -512,18 +533,48 @@ export default function FormBuilderPage() {
         )}
       </AnimatePresence>
 
-      {/* Main Workspace */}
-      <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
-        {/* Canvas */}
-        <div className="flex-1 overflow-y-auto p-6 sm:p-12 bg-inquest-base">
-          <div className="max-w-3xl mx-auto space-y-4 pb-32">
-            <button
-              onClick={() => { setSelectedFieldIndex(null); setShowMobileSidebar(true); }}
-              className="md:hidden w-full py-3 rounded-2xl border-2 border-dashed border-inquest-rule text-inquest-ink-soft hover:border-inquest-accent hover:text-inquest-accent transition-colors font-medium text-sm"
+      {/* Description Modal */}
+      <AnimatePresence>
+        {showDescriptionModal && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4"
+            onClick={() => setShowDescriptionModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-inquest-surface rounded-3xl p-6 md:p-8 max-w-2xl w-full warm-shadow"
             >
-              + Add Question
-            </button>
+              <h3 className="text-xl font-serif text-inquest-ink mb-2">Edit Description</h3>
+              <p className="text-inquest-ink-mid text-sm mb-4">Add context or instructions for your respondents.</p>
+              
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                className="w-full bg-inquest-base border border-inquest-rule focus:border-inquest-accent rounded-xl px-4 py-3 text-inquest-ink min-h-[150px] resize-y"
+                placeholder="Enter description..."
+                autoFocus
+              />
+              
+              <div className="flex gap-3 mt-6">
+                <button 
+                  onClick={() => setShowDescriptionModal(false)} 
+                  className="flex-1 py-3 rounded-full bg-inquest-accent text-white font-medium hover:bg-inquest-accent-soft transition-colors terracotta-glow"
+                >
+                  Done
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
+      {/* Main Workspace */}
+      <div className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
+        {/* Canvas */}
+        <div className="flex-1 overflow-y-auto p-6 sm:p-12 bg-inquest-base pb-32">
+          <div className="max-w-3xl mx-auto space-y-4">
             <AnimatePresence>
               {fields.map((field, idx) => (
                 <motion.div
@@ -564,14 +615,30 @@ export default function FormBuilderPage() {
             {fields.length === 0 && (
               <div className="text-center py-16 bg-inquest-surface border border-inquest-rule border-dashed rounded-3xl">
                 <p className="text-lg font-serif text-inquest-ink">Your canvas is empty.</p>
-                <p className="text-inquest-ink-mid mt-1 text-sm">Select a field type from the panel to begin.</p>
+                <p className="text-inquest-ink-mid mt-1 text-sm">Click the button below to add your first question.</p>
               </div>
             )}
+
+            <div className="pt-4 grid grid-cols-2 gap-3">
+              {FIELD_TYPES.map((type) => {
+                const Icon = type.icon;
+                return (
+                  <button
+                    key={type.type}
+                    onClick={() => addField(type.type)}
+                    className="flex items-center gap-3 p-4 bg-inquest-surface border border-inquest-rule rounded-2xl hover:border-inquest-accent hover:bg-inquest-depth/30 transition-all text-inquest-ink"
+                  >
+                    <Icon size={18} className="text-inquest-ink-soft" />
+                    <span className="text-sm font-medium">{type.label}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
 
         {/* Desktop Sidebar */}
-        <div className="hidden md:flex w-80 bg-inquest-surface border-l border-inquest-rule flex-col overflow-y-auto">
+        <div className="hidden md:flex w-80 bg-inquest-surface border-l border-inquest-rule flex-col overflow-y-auto z-10">
           {selectedField ? (
             <FieldConfigPanel
               field={selectedField}
@@ -579,7 +646,11 @@ export default function FormBuilderPage() {
               onDone={() => setSelectedFieldIndex(null)}
             />
           ) : (
-            <FieldAdderPanel onAddField={addField} />
+            <div className="flex-1 flex flex-col items-center justify-center p-6 text-center text-inquest-ink-ghost">
+              <Settings size={32} className="mb-3 opacity-20" />
+              <p className="text-sm font-medium">No question selected</p>
+              <p className="text-xs mt-1">Select a question to configure its settings</p>
+            </div>
           )}
         </div>
 
@@ -595,17 +666,26 @@ export default function FormBuilderPage() {
                 initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
                 transition={{ type: 'spring', damping: 25, stiffness: 300 }}
                 onClick={(e) => e.stopPropagation()}
-                className="absolute right-0 top-0 bottom-0 w-80 max-w-[85vw] bg-inquest-surface shadow-xl overflow-y-auto"
+                className="absolute right-0 top-0 bottom-0 w-80 max-w-[85vw] bg-inquest-surface shadow-xl flex flex-col"
               >
-                <div className="p-4 border-b border-inquest-rule flex justify-between items-center">
-                  <h3 className="font-serif text-lg text-inquest-ink">{selectedField ? 'Configure' : 'Add Field'}</h3>
+                <div className="p-4 border-b border-inquest-rule flex justify-between items-center shrink-0">
+                  <h3 className="font-serif text-lg text-inquest-ink">Configure</h3>
                   <button onClick={() => setShowMobileSidebar(false)} className="p-2 text-inquest-ink-soft hover:text-inquest-ink">✕</button>
                 </div>
-                {selectedField ? (
-                  <FieldConfigPanel field={selectedField} onUpdate={updateSelectedField} onDone={() => { setSelectedFieldIndex(null); setShowMobileSidebar(false); }} />
-                ) : (
-                  <FieldAdderPanel onAddField={addField} />
-                )}
+                <div className="flex-1 overflow-y-auto">
+                  {selectedField ? (
+                    <FieldConfigPanel
+                      field={selectedField}
+                      onUpdate={updateSelectedField}
+                      onDone={() => { setSelectedFieldIndex(null); setShowMobileSidebar(false); }}
+                    />
+                  ) : (
+                    <div className="flex-1 flex flex-col items-center justify-center p-6 text-center text-inquest-ink-ghost h-full mt-20">
+                      <Settings size={32} className="mb-3 opacity-20" />
+                      <p className="text-sm font-medium">No question selected</p>
+                    </div>
+                  )}
+                </div>
               </motion.div>
             </motion.div>
           )}
@@ -873,31 +953,6 @@ function FieldConfigPanel({ field, onUpdate, onDone }: {
             </div>
           </div>
         )}
-      </div>
-    </div>
-  );
-}
-
-// ─── Field Adder Panel ───────────────────────────────────────
-
-function FieldAdderPanel({ onAddField }: { onAddField: (type: string) => void }) {
-  return (
-    <div className="p-6">
-      <h3 className="font-serif text-lg text-inquest-ink mb-4">Add Field</h3>
-      <div className="grid grid-cols-2 gap-3">
-        {FIELD_TYPES.map((type) => {
-          const Icon = type.icon;
-          return (
-            <button
-              key={type.type}
-              onClick={() => onAddField(type.type)}
-              className="flex flex-col items-center justify-center gap-2 p-4 bg-inquest-base border border-inquest-rule rounded-2xl hover:border-inquest-accent hover:bg-inquest-depth/30 transition-colors text-inquest-ink group"
-            >
-              <Icon size={20} className="text-inquest-ink-soft group-hover:text-inquest-accent transition-colors" />
-              <span className="text-xs font-medium text-center">{type.label}</span>
-            </button>
-          );
-        })}
       </div>
     </div>
   );
