@@ -13,6 +13,21 @@ import {
   submitFormInput,
 } from "./model";
 
+function formatAnswerForDisplay(type: string, answer: string): string {
+  if (type === "multi_select") {
+    try {
+      const parsed = JSON.parse(answer);
+      if (Array.isArray(parsed)) return parsed.join(", ");
+    } catch {}
+  }
+  if (type === "phone" && answer.includes("|")) {
+    const parts = answer.split("|");
+    if (parts[0]) return `${parts[0]} ${parts[1]}`;
+    return parts[1] || answer;
+  }
+  return answer;
+}
+
 class SubmissionService {
   // ─── Helpers ─────────────────────────────────────────
 
@@ -213,9 +228,14 @@ class SubmissionService {
         )
       );
 
+    const processedAnswers = answers.map((ans) => ({
+      ...ans,
+      answer: formatAnswerForDisplay(ans.type, ans.answer),
+    }));
+
     return {
       submitterId: payload.userId,
-      answers,
+      answers: processedAnswers,
     };
   }
 
@@ -278,7 +298,7 @@ class SubmissionService {
         formFieldId: ans.formFieldId,
         label: ans.label,
         type: ans.type,
-        answer: ans.answer,
+        answer: formatAnswerForDisplay(ans.type, ans.answer),
       });
     }
 
@@ -356,7 +376,22 @@ class SubmissionService {
       const answerCount = answers.length;
       const valueCounts: Record<string, number> = {};
       for (const a of answers) {
-        valueCounts[a.answer] = (valueCounts[a.answer] ?? 0) + 1;
+        if (field.type === 'multi_select') {
+          try {
+            const parsed = JSON.parse(a.answer);
+            if (Array.isArray(parsed)) {
+              for (const val of parsed) {
+                valueCounts[val] = (valueCounts[val] ?? 0) + 1;
+              }
+            } else {
+              valueCounts[a.answer] = (valueCounts[a.answer] ?? 0) + 1;
+            }
+          } catch (e) {
+            valueCounts[a.answer] = (valueCounts[a.answer] ?? 0) + 1;
+          }
+        } else {
+          valueCounts[a.answer] = (valueCounts[a.answer] ?? 0) + 1;
+        }
       }
 
       fieldAnalytics.push({

@@ -215,6 +215,51 @@ export default function PublicFormSubmissionPage() {
         }
       }
 
+      // Detailed frontend validation
+      if (answer && field.validation) {
+        if (field.type === 'text' || field.type === 'textarea' || field.type === 'phone') {
+          const checkVal = field.type === 'phone' ? (answers[fid] || '') : answer;
+          if (field.validation.minLength !== undefined && checkVal.length < field.validation.minLength) {
+            toast.error(`${field.label}: Must be at least ${field.validation.minLength} characters`);
+            return;
+          }
+          if (field.validation.maxLength !== undefined && checkVal.length > field.validation.maxLength) {
+            toast.error(`${field.label}: Must be at most ${field.validation.maxLength} characters`);
+            return;
+          }
+          if (field.validation.pattern) {
+            try {
+              if (!new RegExp(field.validation.pattern).test(answer)) {
+                toast.error(`${field.label}: Does not match required format`);
+                return;
+              }
+            } catch(e) {}
+          }
+        }
+        if (field.type === 'number') {
+          const num = Number(answer);
+          if (field.validation.min !== undefined && num < field.validation.min) {
+            toast.error(`${field.label}: Minimum value is ${field.validation.min}`);
+            return;
+          }
+          if (field.validation.max !== undefined && num > field.validation.max) {
+            toast.error(`${field.label}: Maximum value is ${field.validation.max}`);
+            return;
+          }
+        }
+        if (field.type === 'date') {
+          const d = new Date(answer);
+          if (field.validation.minDate && d < new Date(field.validation.minDate)) {
+            toast.error(`${field.label}: Date cannot be before ${field.validation.minDate}`);
+            return;
+          }
+          if (field.validation.maxDate && d > new Date(field.validation.maxDate)) {
+            toast.error(`${field.label}: Date cannot be after ${field.validation.maxDate}`);
+            return;
+          }
+        }
+      }
+
       payload.push({ formFieldId: fid, answer });
     }
 

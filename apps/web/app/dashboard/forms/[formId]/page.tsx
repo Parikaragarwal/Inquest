@@ -364,13 +364,23 @@ export default function FormBuilderPage() {
               <ArrowLeft size={20} />
             </button>
             <div className="flex-1 min-w-0">
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                className="text-xl sm:text-2xl font-serif font-bold text-inquest-ink bg-transparent border-0 focus:ring-0 p-0 w-full placeholder-inquest-ink-ghost"
-                placeholder="Enquiry Title"
-              />
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="text-xl sm:text-2xl font-serif font-bold text-inquest-ink bg-transparent border-0 focus:ring-0 p-0 w-full placeholder-inquest-ink-ghost"
+                  placeholder="Enquiry Title"
+                />
+                <div className="relative group shrink-0">
+                  <div className="w-5 h-5 rounded-full border border-inquest-rule flex items-center justify-center text-xs text-inquest-ink-soft cursor-help hover:bg-inquest-depth hover:text-inquest-ink transition-colors">
+                    ?
+                  </div>
+                  <div className="absolute top-full left-0 mt-2 w-64 p-3 bg-inquest-surface border border-inquest-rule rounded-xl shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 text-xs text-inquest-ink-mid">
+                    This is your enquiry title. It's the first thing respondents will see. The layout auto-saves your progress locally as a draft.
+                  </div>
+                </div>
+              </div>
               <input
                 type="text"
                 value={description}
@@ -440,10 +450,10 @@ export default function FormBuilderPage() {
             <button
               onClick={handleSave}
               disabled={updateForm.isPending}
-              className="flex items-center gap-1.5 bg-inquest-accent text-white px-4 py-2 rounded-full font-medium hover:bg-inquest-accent-soft transition-colors terracotta-glow disabled:opacity-50 text-sm"
+              className="flex items-center gap-1.5 bg-inquest-accent text-white px-5 py-2.5 rounded-full font-medium hover:bg-inquest-accent-soft transition-colors terracotta-glow disabled:opacity-50 text-sm"
             >
               <Save size={15} />
-              <span className="hidden sm:inline">{updateForm.isPending ? 'Saving...' : 'Save'}</span>
+              <span className="hidden sm:inline">{updateForm.isPending ? 'Saving...' : 'Save Changes'}</span>
             </button>
 
             <button
@@ -462,7 +472,7 @@ export default function FormBuilderPage() {
             <AlertCircle size={16} className="text-inquest-sage shrink-0" />
             <span className="text-inquest-ink-mid flex-1">You have unsaved changes from a previous session.</span>
             <button onClick={discardDraft} className="text-xs text-inquest-ink-soft underline hover:text-inquest-caution">Discard</button>
-            <button onClick={handleSave} className="text-xs text-inquest-accent font-medium hover:underline">Save now</button>
+            <button onClick={handleSave} className="text-xs text-inquest-accent font-medium hover:underline">Save Changes</button>
           </div>
         )}
       </header>
@@ -624,7 +634,29 @@ function FieldConfigPanel({ field, onUpdate, onDone }: {
         <h3 className="font-serif text-lg text-inquest-ink flex items-center gap-2">
           <Settings size={17} /> Configuration
         </h3>
-        <button onClick={onDone} className="text-sm text-inquest-accent hover:underline">Done</button>
+        <button onClick={onDone} className="px-3 py-1.5 bg-inquest-depth text-inquest-ink text-xs font-medium rounded-full hover:bg-inquest-rule transition-colors">
+          Close Panel
+        </button>
+      </div>
+
+      {/* Field Type */}
+      <div>
+        <label className="block text-xs font-semibold text-inquest-ink-soft uppercase tracking-wider mb-1">Field Type</label>
+        <select
+          value={field.type}
+          onChange={(e) => {
+            const newType = e.target.value;
+            const newValidation = newType === 'single_select' || newType === 'multi_select' 
+              ? { options: ['Option 1', 'Option 2'] } 
+              : null;
+            onUpdate({ type: newType, validation: newValidation });
+          }}
+          className="w-full bg-inquest-base border border-inquest-rule focus:border-inquest-accent rounded-xl px-3 py-2 text-inquest-ink text-sm"
+        >
+          {FIELD_TYPES.map(t => (
+            <option key={t.type} value={t.type}>{t.label}</option>
+          ))}
+        </select>
       </div>
 
       {/* Label */}

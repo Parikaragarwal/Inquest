@@ -30,12 +30,12 @@ export default function DashboardPage() {
   const createForm = trpc.form.createForm.useMutation({
     onSuccess: (data) => {
       setNewTitle('');
-      toast.success('Enquiry created successfully');
+      toast.success('Form created successfully');
       utils.form.getMyForms.invalidate();
       router.push(`/dashboard/forms/${data?.id}`);
     },
     onError: (error) => {
-      toast.error(error.message || 'Failed to create enquiry');
+      toast.error(error.message || 'Failed to create form');
     }
   });
 
@@ -93,7 +93,7 @@ export default function DashboardPage() {
               <h2 className="text-lg sm:text-xl font-serif text-inquest-ink mb-4 font-semibold">Quick-Start Companion</h2>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
                 {[
-                  { title: "1. Create", desc: "Type a title below to start a new enquiry." },
+                  { title: "1. Create", desc: "Type a title below to start a new form." },
                   { title: "2. Build", desc: "Add fields in the visual editor." },
                   { title: "3. Secure", desc: "Keep it public or private with a code." },
                   { title: "4. Listen", desc: "Share the link and gather insights." }
@@ -111,13 +111,13 @@ export default function DashboardPage() {
 
       {/* Inline Form Creator */}
       <section>
-        <h2 className="text-xs sm:text-sm font-medium text-inquest-ink-soft mb-3 uppercase tracking-widest pl-2">Start New Enquiry</h2>
+        <h2 className="text-xs sm:text-sm font-medium text-inquest-ink-soft mb-3 uppercase tracking-widest pl-2">Create New Form</h2>
         <form onSubmit={handleCreate} className="relative flex items-center">
           <input 
             type="text"
             value={newTitle}
             onChange={(e) => setNewTitle(e.target.value)}
-            placeholder="E.g., What defines a life well lived?"
+            placeholder="E.g., Event Registration Form"
             disabled={createForm.isPending}
             className="w-full bg-inquest-surface border border-inquest-rule rounded-full py-3.5 sm:py-4 pl-5 sm:pl-6 pr-28 sm:pr-40 text-base sm:text-lg text-inquest-ink placeholder-inquest-ink-ghost focus:outline-none focus:ring-2 focus:ring-inquest-accent focus:border-transparent transition-all warm-shadow"
           />
@@ -134,7 +134,7 @@ export default function DashboardPage() {
       {/* Active Enquiries Feed */}
       <section>
         <div className="flex items-center justify-between mb-4 sm:mb-6 pl-2">
-          <h2 className="text-xs sm:text-sm font-medium text-inquest-ink-soft uppercase tracking-widest">Active Enquiries</h2>
+          <h2 className="text-xs sm:text-sm font-medium text-inquest-ink-soft uppercase tracking-widest">Active Forms</h2>
           <span className="bg-inquest-surface text-inquest-ink-mid text-xs px-3 py-1 rounded-full border border-inquest-rule font-medium">
             {forms?.length || 0} Total
           </span>
@@ -149,8 +149,8 @@ export default function DashboardPage() {
         ) : forms?.length === 0 ? (
           <div className="text-center py-12 sm:py-16 bg-inquest-surface rounded-3xl border border-inquest-rule border-dashed">
             <FileText className="mx-auto h-10 w-10 sm:h-12 sm:w-12 text-inquest-ink-ghost mb-4" />
-            <h3 className="text-lg font-serif text-inquest-ink">No enquiries yet</h3>
-            <p className="text-inquest-ink-mid mt-1 text-sm">Create your first enquiry using the input above.</p>
+            <h3 className="text-lg font-serif text-inquest-ink">No forms yet</h3>
+            <p className="text-inquest-ink-mid mt-1 text-sm">Create your first form using the input above.</p>
           </div>
         ) : (
           <div className="space-y-3 sm:space-y-4">
