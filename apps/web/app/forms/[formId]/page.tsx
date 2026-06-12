@@ -85,8 +85,8 @@ export default function PublicFormSubmissionPage() {
             if (field.type === 'email' && user.email) {
               next[fid] = user.email;
               hasChanges = true;
-            } else if (field.type === 'text' && field.label.toLowerCase().includes('name') && user.name) {
-              next[fid] = user.name;
+            } else if (field.type === 'text' && field.label.toLowerCase().includes('name') && user.fullName) {
+              next[fid] = user.fullName;
               hasChanges = true;
             }
           }
@@ -96,6 +96,13 @@ export default function PublicFormSubmissionPage() {
       });
     }
   }, [form, user, isSignedIn]);
+
+  // Show toast if the secure code was invalid
+  useEffect(() => {
+    if (formError?.message?.toLowerCase().includes('secure code') && secureCode) {
+      toast.error('Invalid secure code. Please try again.');
+    }
+  }, [formError, secureCode]);
 
   const isMissingCodeError = formError?.message?.toLowerCase().includes('secure code');
 

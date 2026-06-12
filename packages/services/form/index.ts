@@ -80,7 +80,7 @@ class FormService {
         .values({
           title: input.title,
           description: input.description ?? null,
-          secureCode: input.secureCode ?? null,
+          secureCode: input.secureCode || null,
           isOpenForSubmission: input.isOpenForSubmission,
           requiresAuth: input.requiresAuth,
           createdBy: input.userId,
@@ -150,7 +150,7 @@ class FormService {
       if (input.description !== undefined)
         updateData.description = input.description;
       if (input.secureCode !== undefined)
-        updateData.secureCode = input.secureCode;
+        updateData.secureCode = input.secureCode || null;
       if (input.isOpenForSubmission !== undefined)
         updateData.isOpenForSubmission = input.isOpenForSubmission;
       if (input.requiresAuth !== undefined)
@@ -315,7 +315,7 @@ class FormService {
     }
 
     // Secure code check
-    if (form.secureCode !== null) {
+    if (form.secureCode) {
       if (!payload.secureCode || payload.secureCode !== form.secureCode) {
         throw new Error("Invalid or missing secure code");
       }
@@ -365,7 +365,7 @@ class FormService {
 
     await db
       .update(formsTable)
-      .set({ secureCode: payload.secureCode })
+      .set({ secureCode: payload.secureCode || null })
       .where(eq(formsTable.id, payload.id));
 
     return { id: payload.id, secureCode: payload.secureCode };
