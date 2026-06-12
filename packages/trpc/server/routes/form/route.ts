@@ -1,3 +1,4 @@
+import { TRPCError } from "@trpc/server";
 import { formService } from "../../services";
 import { publicProcedure, authenticatedProcedure, router } from "../../trpc";
 import { generatePath } from "../../utils/path-generator";
@@ -121,10 +122,20 @@ export const formRouter = router({
     .input(getFormForSubmissionInputModel)
     .output(getFormForSubmissionOutputModel)
     .query(async ({ input }) => {
-      return formService.getFormForSubmission({
-        formId: input.formId,
-        secureCode: input.secureCode,
-      });
+      try {
+        return await formService.getFormForSubmission({
+          formId: input.formId,
+          secureCode: input.secureCode,
+        });
+      } catch (err) {
+        if (err instanceof Error) {
+          throw new TRPCError({
+            code: err.message.includes("secure code") ? "UNAUTHORIZED" : "BAD_REQUEST",
+            message: err.message,
+          });
+        }
+        throw err;
+      }
     }),
 
   setFormSubmissionStatus: authenticatedProcedure

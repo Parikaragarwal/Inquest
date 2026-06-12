@@ -156,6 +156,9 @@ class FormService {
       if (input.requiresAuth !== undefined)
         updateData.requiresAuth = input.requiresAuth;
 
+      console.log("[updateForm] Input secureCode:", input.secureCode);
+      console.log("[updateForm] Updating data:", updateData);
+
       if (Object.keys(updateData).length > 0) {
         await tx
           .update(formsTable)

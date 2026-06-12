@@ -50,6 +50,7 @@ type DraftState = {
   description: string;
   isOpenForSubmission: boolean;
   requiresAuth: boolean;
+  secureCode: string | null;
   fields: FormField[];
 };
 
@@ -119,6 +120,7 @@ export default function FormBuilderPage() {
   const [description, setDescription] = useState('');
   const [isOpenForSubmission, setIsOpenForSubmission] = useState(true);
   const [requiresAuth, setRequiresAuth] = useState(true);
+  const [secureCode, setSecureCode] = useState<string | null>(null);
   const [fields, setFields] = useState<FormField[]>([]);
   const [selectedFieldIndex, setSelectedFieldIndex] = useState<number | null>(null);
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
@@ -144,6 +146,7 @@ export default function FormBuilderPage() {
         setDescription(draft.description);
         setIsOpenForSubmission(draft.isOpenForSubmission !== undefined ? draft.isOpenForSubmission : true);
         setRequiresAuth(draft.requiresAuth !== undefined ? draft.requiresAuth : true);
+        setSecureCode(draft.secureCode !== undefined ? draft.secureCode : null);
         setFields(draft.fields);
         setHasDraft(true);
         return;
@@ -161,6 +164,7 @@ export default function FormBuilderPage() {
     setDescription(serverForm.description || '');
     setIsOpenForSubmission(serverForm.isOpenForSubmission);
     setRequiresAuth(serverForm.requiresAuth);
+    setSecureCode(serverForm.secureCode);
     const sorted = [...serverForm.fields].sort(
       (a, b) => Number(a.orderIndex) - Number(b.orderIndex)
     );
@@ -182,9 +186,9 @@ export default function FormBuilderPage() {
   // Auto-save draft to localStorage whenever state changes
   const saveDraft = useCallback(() => {
     if (!loadedFromServer.current) return;
-    const draft: DraftState = { title, description, isOpenForSubmission, requiresAuth, fields };
+    const draft: DraftState = { title, description, isOpenForSubmission, requiresAuth, secureCode, fields };
     localStorage.setItem(getDraftKey(formId), JSON.stringify(draft));
-  }, [title, description, isOpenForSubmission, requiresAuth, fields, formId]);
+  }, [title, description, isOpenForSubmission, requiresAuth, secureCode, fields, formId]);
 
   useEffect(() => {
     saveDraft();
@@ -212,17 +216,6 @@ export default function FormBuilderPage() {
     },
     onError: (err) => {
       toast.error(err.message || 'Failed to save');
-    }
-  });
-
-  const updateSecureCode = trpc.form.updateFormSecureCode.useMutation({
-    onSuccess: (data) => {
-      if (data.secureCode) {
-        toast.success(`Now private — Secure Code: ${data.secureCode}`);
-      } else {
-        toast.success('Form is now public');
-      }
-      utils.form.getFormById.invalidate({ id: formId });
     }
   });
 
@@ -257,41 +250,22 @@ export default function FormBuilderPage() {
       description: description || undefined,
       isOpenForSubmission: isOpenForSubmission,
       requiresAuth: requiresAuth,
+      secureCode: secureCode,
       fields: fields.map(buildFieldPayload),
     });
   };
 
-  // Save fields first, THEN toggle privacy so no unsaved data is lost
   const handleTogglePrivacy = () => {
-    const currentSecureCode = form?.secureCode;
-    // Optimistically save fields first
-    updateForm.mutate(
-      {
-        id: formId,
-        title,
-        description: description || undefined,
-        isOpenForSubmission: isOpenForSubmission,
-        requiresAuth: requiresAuth,
-        fields: fields.map(buildFieldPayload),
-      },
-      {
-        onSuccess: () => {
-          if (currentSecureCode) {
-            // Currently private → go public
-            updateSecureCode.mutate({ id: formId, secureCode: null });
-          } else {
-            // Currently public → go private
-            const code = Math.random().toString(36).substring(2, 8).toUpperCase();
-            updateSecureCode.mutate({ id: formId, secureCode: code });
-          }
-        }
-      }
-    );
+    if (secureCode) {
+      setSecureCode(null);
+    } else {
+      setSecureCode(Math.random().toString(36).substring(2, 8).toUpperCase());
+    }
   };
 
   const copySecureCode = () => {
-    if (form?.secureCode) {
-      navigator.clipboard.writeText(form.secureCode);
+    if (secureCode) {
+      navigator.clipboard.writeText(secureCode);
       toast.success('Secure code copied!');
     }
   };
@@ -368,7 +342,7 @@ export default function FormBuilderPage() {
 
   const selectedField = selectedFieldIndex !== null ? fields[selectedFieldIndex] : null;
   const responseCount = submissionCount?.count ?? 0;
-  const isPrivate = !!form.secureCode;
+  const isPrivate = !!secureCode;
 
   return (
     <div className="h-[calc(100vh-60px)] md:h-[calc(100vh-96px)] flex flex-col -mx-6 -my-6 sm:-mx-8 sm:-my-8 md:-mx-12 md:-my-12 pt-16 md:pt-0 overflow-hidden bg-inquest-base">
@@ -594,7 +568,7 @@ export default function FormBuilderPage() {
                     <div className="flex items-center bg-inquest-surface rounded-full p-1 border border-inquest-rule/50 shadow-sm">
                       <button
                         onClick={() => { if (isPrivate) handleTogglePrivacy(); }}
-                        disabled={updateForm.isPending || updateSecureCode.isPending}
+                        disabled={updateForm.isPending}
                         className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all ${
                           !isPrivate ? 'bg-inquest-surface shadow text-inquest-ink border border-inquest-rule' : 'text-inquest-ink-soft hover:text-inquest-ink'
                         }`}
@@ -603,7 +577,7 @@ export default function FormBuilderPage() {
                       </button>
                       <button
                         onClick={() => { if (!isPrivate) handleTogglePrivacy(); }}
-                        disabled={updateForm.isPending || updateSecureCode.isPending}
+                        disabled={updateForm.isPending}
                         className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all ${
                           isPrivate ? 'bg-inquest-surface shadow text-inquest-ink border border-inquest-rule' : 'text-inquest-ink-soft hover:text-inquest-ink'
                         }`}
@@ -616,7 +590,7 @@ export default function FormBuilderPage() {
                     <div className="bg-inquest-surface rounded-xl p-3 border border-inquest-rule/50 flex items-center justify-between gap-3">
                       <div className="flex items-center gap-2">
                         <Lock size={14} className="text-inquest-ink-ghost" />
-                        <span className="text-sm font-mono text-inquest-ink font-medium tracking-widest">{form.secureCode}</span>
+                        <span className="text-sm font-mono text-inquest-ink font-medium tracking-widest">{secureCode}</span>
                       </div>
                       <button onClick={copySecureCode} className="text-xs text-inquest-accent font-medium hover:underline">Copy Code</button>
                     </div>
