@@ -19,9 +19,7 @@ export const answerTable = pgTable(
 
     answer: text("answer").notNull(),
 
-    submitterId: uuid("submitter_id")
-      .notNull()
-      .references(() => usersTable.id),
+    submitterId: uuid("submitter_id").notNull(),
   },
   (table) => [
     index("answer_form_field_id_index").on(table.formFieldId),

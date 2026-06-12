@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { db, eq, and, inArray, sql, countDistinct } from "@repo/database";
 import { formsTable } from "@repo/database/models/form";
 import { formFieldTable } from "@repo/database/models/form-field";
@@ -75,6 +76,14 @@ class SubmissionService {
         }
       }
 
+      let submitterId = input.userId;
+      if (!submitterId) {
+        if (form.requiresAuth) {
+          throw new Error("This form requires you to be logged in.");
+        }
+        submitterId = randomUUID();
+      }
+
       // Load form fields
       const fields = await tx
         .select()
@@ -125,7 +134,8 @@ class SubmissionService {
         );
       }
 
-      // Check user has not already submitted
+      // Check user has not already submitted (if they have a real ID or we passed one)
+      // For truly anonymous (random UUID), this will just be empty.
       const existingAnswers = await tx
         .select({ id: answerTable.id })
         .from(answerTable)
@@ -135,7 +145,7 @@ class SubmissionService {
               answerTable.formFieldId,
               fields.map((f) => f.id)
             ),
-            eq(answerTable.submitterId, input.userId)
+            eq(answerTable.submitterId, submitterId)
           )
         );
 
@@ -147,7 +157,7 @@ class SubmissionService {
       const answerValues = input.answers.map((a) => ({
         formFieldId: a.formFieldId,
         answer: a.answer,
-        submitterId: input.userId,
+        submitterId: submitterId!,
       }));
 
       const insertedAnswers = await tx
@@ -171,7 +181,15 @@ class SubmissionService {
     if (!fields || fields.length === 0) {
       return {
         formId: payload.formId,
-        userId: payload.userId,
+        userId: payload.userId || "",
+        hasSubmitted: false,
+      };
+    }
+
+    if (!payload.userId) {
+      return {
+        formId: payload.formId,
+        userId: "",
         hasSubmitted: false,
       };
     }
@@ -191,7 +209,7 @@ class SubmissionService {
 
     return {
       formId: payload.formId,
-      userId: payload.userId,
+      userId: payload.userId || "",
       hasSubmitted: existingAnswers.length > 0,
     };
   }

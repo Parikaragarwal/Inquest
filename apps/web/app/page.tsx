@@ -93,11 +93,11 @@ export default function LandingPage() {
           transition={{ delay: 0.1, duration: 0.8 }}
           className="text-4xl sm:text-5xl md:text-7xl font-serif text-inquest-ink leading-[1.1] tracking-tight mb-6 sm:mb-8"
         >
-          Ask questions that
+          Simple to create.
           <br />
-          <span className="text-inquest-accent">reach the people</span>
+          <span className="text-inquest-accent">Powerful</span>
           <br />
-          who know.
+          to analyze.
         </motion.h2>
 
         <motion.p 
@@ -106,7 +106,7 @@ export default function LandingPage() {
           transition={{ delay: 0.2, duration: 0.8 }}
           className="text-base sm:text-lg md:text-xl text-inquest-ink-mid max-w-2xl mb-10 sm:mb-14 leading-relaxed"
         >
-          Inquest replaces clinical surveys with warm, thoughtful forms that invite real reflection. Create beautiful enquiries and gather insights that matter.
+          Inquest makes form building incredibly simple while offering deep, detailed analytics to understand your responses. Create beautiful forms in seconds and gain powerful insights instantly.
         </motion.p>
 
         <motion.div 
@@ -141,7 +141,7 @@ export default function LandingPage() {
               {
                 step: '01',
                 title: 'Create',
-                description: 'Type a question. Add text fields, choices, or scales in our visual builder. Make it public or private with a secure code.',
+                description: 'Build your form in seconds with our intuitive drag-and-drop visual builder. No complex setup required.',
                 icon: MessageSquare,
               },
               {
@@ -153,7 +153,7 @@ export default function LandingPage() {
               {
                 step: '03',
                 title: 'Discover',
-                description: 'Read every response. See answer distributions and patterns emerge. Gather insights you can act on.',
+                description: 'Dive deep into detailed analytics. Visualize your data with beautiful Recharts, pie charts, and distribution graphs.',
                 icon: BarChart3,
               },
             ].map((item, i) => (
@@ -182,7 +182,7 @@ export default function LandingPage() {
             Why Inquest
           </motion.h3>
           <motion.p {...fadeInUp} className="text-center text-3xl sm:text-4xl font-serif text-inquest-ink mb-12 sm:mb-16 max-w-2xl mx-auto leading-tight">
-            Built for depth, not speed
+            Powerful Insights, Seamless Experience
           </motion.p>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {[
@@ -191,7 +191,7 @@ export default function LandingPage() {
               { icon: BarChart3, title: 'Real-time Analytics', desc: 'See answer distributions, response counts, and individual submissions as they arrive.' },
               { icon: Shield, title: 'Your Data, Your Auth', desc: 'No third-party auth services. Your data lives in your database, secured by your own JWT tokens.' },
               { icon: MessageSquare, title: 'Rich Field Types', desc: 'Text, numbers, dates, yes/no, single choice, multi choice, email, and phone — all beautifully rendered.' },
-              { icon: Sparkles, title: 'Zero Friction', desc: 'Create an enquiry in seconds. Share a link. Start listening. No complex setup required.' },
+              { icon: Sparkles, title: 'Simplicity of Use', desc: 'Create an enquiry in seconds. Share a link. Start listening. No complex setup required.' },
             ].map((feature, i) => (
               <motion.div
                 key={i}
@@ -216,7 +216,7 @@ export default function LandingPage() {
         >
           <div className="w-12 h-px bg-inquest-accent mx-auto mb-8" />
           <blockquote className="text-2xl sm:text-3xl md:text-4xl font-serif text-inquest-ink leading-snug italic mb-8">
-            &ldquo;A good question is never just about getting an answer. It&rsquo;s about opening a space for someone to think.&rdquo;
+            &ldquo;We believe that creating forms shouldn't be a chore, and understanding the data shouldn't require a data science degree.&rdquo;
           </blockquote>
           <p className="text-inquest-ink-soft text-sm uppercase tracking-widest">— The Inquest Philosophy</p>
         </motion.div>

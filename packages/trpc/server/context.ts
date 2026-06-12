@@ -5,6 +5,7 @@ export interface TRPCContext {
     getCookie: ReturnType<typeof getCookieFactory>
     clearCookie: ReturnType<typeof clearCookieFactory>
     user?: { id: string }
+    ip: string
 }
 
 export async function createContext({
@@ -15,6 +16,7 @@ export async function createContext({
         createCookie: createCookieFactory(res),
         getCookie: getCookieFactory(req),
         clearCookie: clearCookieFactory(res),
+        ip: (req.headers['x-forwarded-for'] as string)?.split(',')[0] || req.socket.remoteAddress || '127.0.0.1',
     }
     return ctx;
 }

@@ -3,8 +3,8 @@
 import { useParams, useRouter } from 'next/navigation';
 import { trpc } from '~/trpc/client';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Users, BarChart3, ChevronDown, ChevronUp, MessageSquare } from 'lucide-react';
-import { useState } from 'react';
+import { ArrowLeft, Users, BarChart3, ChevronDown, ChevronUp, MessageSquare, Network } from 'lucide-react';
+import { useState, useMemo } from 'react';
 import Link from 'next/link';
 
 export default function FormResponsesPage() {
@@ -28,6 +28,46 @@ export default function FormResponsesPage() {
   );
 
   const [expandedSubmission, setExpandedSubmission] = useState<string | null>(null);
+  const [crossTabX, setCrossTabX] = useState<string>('');
+  const [crossTabY, setCrossTabY] = useState<string>('');
+
+  const crossTabMatrix = useMemo(() => {
+    if (!crossTabX || !crossTabY || !responses) return null;
+    const matrix: Record<string, Record<string, number>> = {};
+    const xValues = new Set<string>();
+    const yValues = new Set<string>();
+
+    responses.forEach(sub => {
+      let xAns = sub.answers.find(a => a.formFieldId === crossTabX)?.answer || '(Empty)';
+      let yAns = sub.answers.find(a => a.formFieldId === crossTabY)?.answer || '(Empty)';
+
+      // If answer is a stringified JSON array, use the first element or stringify nicely
+      try {
+        const px = JSON.parse(xAns);
+        if (Array.isArray(px)) xAns = px.join(', ') || '(Empty)';
+      } catch { }
+      try {
+        const py = JSON.parse(yAns);
+        if (Array.isArray(py)) yAns = py.join(', ') || '(Empty)';
+      } catch { }
+
+      xValues.add(xAns);
+      yValues.add(yAns);
+
+      let row = matrix[xAns];
+      if (!row) {
+        row = {};
+        matrix[xAns] = row;
+      }
+      row[yAns] = (row[yAns] || 0) + 1;
+    });
+
+    return {
+      matrix,
+      xValues: Array.from(xValues).sort(),
+      yValues: Array.from(yValues).sort(),
+    };
+  }, [crossTabX, crossTabY, responses]);
 
   const isLoading = isFormLoading || isResponsesLoading || isAnalyticsLoading;
 
@@ -114,7 +154,7 @@ export default function FormResponsesPage() {
                 <div key={field.fieldId} className="bg-inquest-surface p-6 rounded-3xl border border-inquest-rule/50">
                   <h3 className="font-serif text-lg text-inquest-ink mb-1">{field.label}</h3>
                   <p className="text-xs text-inquest-ink-ghost mb-4 uppercase tracking-wider">{field.type} • {field.answerCount} answers</p>
-                  
+
                   {entries.length === 0 ? (
                     <p className="text-sm text-inquest-ink-ghost italic">No answers yet</p>
                   ) : field.type === 'boolean' || field.type === 'single_select' || field.type === 'multi_select' ? (
@@ -156,10 +196,113 @@ export default function FormResponsesPage() {
         </section>
       )}
 
+      {/* Cross Tabulation */}
+      {form.fields.length > 1 && responses && responses.length > 0 && (
+        <section>
+          <div className="flex items-center gap-2 mb-4 pl-2">
+            <Network size={18} className="text-inquest-accent" />
+            <h2 className="text-sm font-medium text-inquest-ink-soft uppercase tracking-widest">Cross-Tabulation Analysis</h2>
+          </div>
+          <div className="bg-inquest-surface p-6 rounded-3xl border border-inquest-rule/50 overflow-hidden">
+            <p className="text-inquest-ink-mid text-sm mb-6">Select two questions to compare their answers against each other.</p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+              <div>
+                <label className="block text-xs font-semibold text-inquest-ink-soft uppercase tracking-wider mb-2">Question 1 (Rows)</label>
+                <select
+                  value={crossTabX}
+                  onChange={(e) => setCrossTabX(e.target.value)}
+                  className="w-full bg-inquest-base border border-inquest-rule rounded-xl px-4 py-3 text-inquest-ink text-sm focus:border-inquest-accent focus:ring-1 focus:ring-inquest-accent"
+                >
+                  <option value="">Select a question...</option>
+                  {form.fields.map(f => (
+                    <option key={f.id} value={f.id}>{f.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-inquest-ink-soft uppercase tracking-wider mb-2">Question 2 (Columns)</label>
+                <select
+                  value={crossTabY}
+                  onChange={(e) => setCrossTabY(e.target.value)}
+                  className="w-full bg-inquest-base border border-inquest-rule rounded-xl px-4 py-3 text-inquest-ink text-sm focus:border-inquest-accent focus:ring-1 focus:ring-inquest-accent"
+                >
+                  <option value="">Select a question...</option>
+                  {form.fields.map(f => (
+                    <option key={f.id} value={f.id}>{f.label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {crossTabMatrix ? (
+              <div className="overflow-x-auto rounded-2xl border border-inquest-rule/50">
+                <table className="w-full text-left text-sm whitespace-nowrap">
+                  <thead className="bg-inquest-base border-b border-inquest-rule/50">
+                    <tr>
+                      <th className="p-4 font-medium text-inquest-ink-mid bg-inquest-base border-r border-inquest-rule/50 sticky left-0 z-10 shadow-[1px_0_0_0_var(--inquest-rule)]">Q1 \ Q2</th>
+                      {crossTabMatrix.yValues.map(y => (
+                        <th key={y} className="p-4 font-medium text-inquest-ink-mid text-center">{y}</th>
+                      ))}
+                      <th className="p-4 font-bold text-inquest-ink bg-inquest-depth/30 text-center">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-inquest-rule/50">
+                    {crossTabMatrix.xValues.map(x => {
+                      let rowTotal = 0;
+                      return (
+                        <tr key={x} className="hover:bg-inquest-depth/20 transition-colors">
+                          <td className="p-4 text-inquest-ink font-medium bg-inquest-surface border-r border-inquest-rule/50 sticky left-0 z-10 shadow-[1px_0_0_0_var(--inquest-rule)]">
+                            {x}
+                          </td>
+                          {crossTabMatrix.yValues.map(y => {
+                            const val = crossTabMatrix.matrix[x]?.[y] || 0;
+                            rowTotal += val;
+                            return (
+                              <td key={y} className="p-4 text-inquest-ink-soft text-center bg-inquest-base/30">
+                                {val > 0 ? (
+                                  <span className="inline-flex items-center justify-center min-w-[28px] h-7 px-2 rounded-full bg-inquest-accent/10 text-inquest-accent font-semibold">
+                                    {val}
+                                  </span>
+                                ) : (
+                                  <span className="text-inquest-ink-ghost">—</span>
+                                )}
+                              </td>
+                            );
+                          })}
+                          <td className="p-4 font-bold text-inquest-ink bg-inquest-depth/30 text-center">{rowTotal}</td>
+                        </tr>
+                      );
+                    })}
+                    <tr className="bg-inquest-depth/30 border-t-2 border-inquest-rule">
+                      <td className="p-4 font-bold text-inquest-ink bg-inquest-depth sticky left-0 z-10 shadow-[1px_0_0_0_var(--inquest-rule)]">Total</td>
+                      {crossTabMatrix.yValues.map(y => {
+                        let colTotal = 0;
+                        crossTabMatrix.xValues.forEach(x => {
+                          colTotal += crossTabMatrix.matrix[x]?.[y] || 0;
+                        });
+                        return (
+                          <td key={y} className="p-4 font-bold text-inquest-ink text-center">{colTotal}</td>
+                        );
+                      })}
+                      <td className="p-4 font-bold text-inquest-accent text-center">{responses.length}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-center py-12 bg-inquest-base rounded-2xl border border-inquest-rule border-dashed">
+                <p className="text-inquest-ink-ghost italic text-sm">Select two questions above to see how they correlate.</p>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
       {/* Individual Responses */}
       <section>
         <h2 className="text-sm font-medium text-inquest-ink-soft mb-4 uppercase tracking-widest pl-2">Individual Submissions</h2>
-        
+
         {!responses || responses.length === 0 ? (
           <div className="text-center py-16 bg-inquest-surface rounded-3xl border border-inquest-rule border-dashed">
             <Users className="mx-auto h-12 w-12 text-inquest-ink-ghost mb-4" />

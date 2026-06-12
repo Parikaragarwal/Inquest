@@ -28,6 +28,10 @@ export const formsTable = pgTable(
       .notNull()
       .default(true),
 
+    requiresAuth: boolean("requires_auth")
+      .notNull()
+      .default(true),
+
     createdAt: timestamp("created_at").defaultNow(),
     updatedAt: timestamp("updated_at").$onUpdate(() => new Date()),
   },

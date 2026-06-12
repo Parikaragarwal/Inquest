@@ -3,13 +3,13 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { trpc } from '~/trpc/client';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, Reorder } from 'framer-motion';
 import { toast } from 'sonner';
 import {
   Save, Globe, Lock, ArrowLeft, Trash2,
   Settings, Type, FileText, Hash, CheckSquare,
   Calendar, List, CheckCircle, Mail, Phone,
-  ArrowUp, ArrowDown, Copy, ExternalLink, Users, ClipboardCopy, AlertCircle, Edit3
+  ArrowUp, ArrowDown, Copy, ExternalLink, Users, ClipboardCopy, AlertCircle, Edit3, GripVertical, Eye, EyeOff
 } from 'lucide-react';
 import { useGetuser } from '~/hooks/api/auth';
 import Link from 'next/link';
@@ -36,6 +36,7 @@ type FieldValidation = {
 
 type FormField = {
   id?: string;
+  localId: string;
   label: string;
   type: string;
   required: boolean;
@@ -47,6 +48,8 @@ type FormField = {
 type DraftState = {
   title: string;
   description: string;
+  isOpenForSubmission: boolean;
+  requiresAuth: boolean;
   fields: FormField[];
 };
 
@@ -114,11 +117,14 @@ export default function FormBuilderPage() {
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [isOpenForSubmission, setIsOpenForSubmission] = useState(true);
+  const [requiresAuth, setRequiresAuth] = useState(true);
   const [fields, setFields] = useState<FormField[]>([]);
   const [selectedFieldIndex, setSelectedFieldIndex] = useState<number | null>(null);
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showDescriptionModal, setShowDescriptionModal] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [hasDraft, setHasDraft] = useState(false);
 
   // Track whether we loaded from server yet (to avoid overwriting draft on re-renders)
@@ -136,6 +142,8 @@ export default function FormBuilderPage() {
         const draft: DraftState = JSON.parse(draftRaw);
         setTitle(draft.title);
         setDescription(draft.description);
+        setIsOpenForSubmission(draft.isOpenForSubmission !== undefined ? draft.isOpenForSubmission : true);
+        setRequiresAuth(draft.requiresAuth !== undefined ? draft.requiresAuth : true);
         setFields(draft.fields);
         setHasDraft(true);
         return;
@@ -151,12 +159,15 @@ export default function FormBuilderPage() {
   function applyServerData(serverForm: NonNullable<typeof form>) {
     setTitle(serverForm.title);
     setDescription(serverForm.description || '');
+    setIsOpenForSubmission(serverForm.isOpenForSubmission);
+    setRequiresAuth(serverForm.requiresAuth);
     const sorted = [...serverForm.fields].sort(
       (a, b) => Number(a.orderIndex) - Number(b.orderIndex)
     );
     setFields(
       sorted.map((f, i) => ({
         id: f.id,
+        localId: f.id,
         label: f.label,
         type: f.type,
         required: f.required,
@@ -171,9 +182,9 @@ export default function FormBuilderPage() {
   // Auto-save draft to localStorage whenever state changes
   const saveDraft = useCallback(() => {
     if (!loadedFromServer.current) return;
-    const draft: DraftState = { title, description, fields };
+    const draft: DraftState = { title, description, isOpenForSubmission, requiresAuth, fields };
     localStorage.setItem(getDraftKey(formId), JSON.stringify(draft));
-  }, [title, description, fields, formId]);
+  }, [title, description, isOpenForSubmission, requiresAuth, fields, formId]);
 
   useEffect(() => {
     saveDraft();
@@ -236,7 +247,7 @@ export default function FormBuilderPage() {
     required: f.required,
     placeholder: f.placeholder || undefined,
     validation: f.validation || undefined,
-    orderIndex: i,
+    orderIndex: i * 10,
   });
 
   const handleSave = () => {
@@ -244,7 +255,8 @@ export default function FormBuilderPage() {
       id: formId,
       title,
       description: description || undefined,
-      isOpenForSubmission: true,
+      isOpenForSubmission: isOpenForSubmission,
+      requiresAuth: requiresAuth,
       fields: fields.map(buildFieldPayload),
     });
   };
@@ -258,7 +270,8 @@ export default function FormBuilderPage() {
         id: formId,
         title,
         description: description || undefined,
-        isOpenForSubmission: true,
+        isOpenForSubmission: isOpenForSubmission,
+        requiresAuth: requiresAuth,
         fields: fields.map(buildFieldPayload),
       },
       {
@@ -306,6 +319,7 @@ export default function FormBuilderPage() {
     }
 
     const newField: FormField = {
+      localId: crypto.randomUUID(),
       label: 'New Question',
       type,
       required: false,
@@ -338,35 +352,8 @@ export default function FormBuilderPage() {
       setSelectedFieldIndex(selectedFieldIndex - 1);
   };
 
-  const moveField = (index: number, direction: 'up' | 'down', e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (direction === 'up' && index === 0) return;
-    if (direction === 'down' && index === fields.length - 1) return;
-    
-    const target = direction === 'up' ? index - 1 : index + 1;
-    const newFields = [...fields];
-
-    let newOrderIndex: number;
-    if (direction === 'up') {
-      if (target === 0) {
-        newOrderIndex = Number(newFields[0]!.orderIndex) - 1;
-      } else {
-        newOrderIndex = (Number(newFields[target - 1]!.orderIndex) + Number(newFields[target]!.orderIndex)) / 2;
-      }
-    } else {
-      if (target === fields.length - 1) {
-        newOrderIndex = Number(newFields[fields.length - 1]!.orderIndex) + 1;
-      } else {
-        newOrderIndex = (Number(newFields[target]!.orderIndex) + Number(newFields[target + 1]!.orderIndex)) / 2;
-      }
-    }
-
-    const fieldToMove = { ...newFields[index]!, orderIndex: newOrderIndex };
-    newFields.splice(index, 1);
-    newFields.splice(target, 0, fieldToMove);
-
+  const handleReorder = (newFields: FormField[]) => {
     setFields(newFields);
-    setSelectedFieldIndex(target);
   };
 
   // ─── Render ─────────────────────────────────────────────────
@@ -430,59 +417,37 @@ export default function FormBuilderPage() {
 
           {/* Right: actions */}
           <div className="flex items-center gap-2 flex-wrap shrink-0">
-            {/* Secure code chip */}
-            {form.secureCode && (
-              <button
-                onClick={copySecureCode}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-inquest-depth border border-inquest-rule text-xs font-mono text-inquest-ink hover:bg-inquest-rule/50 transition-colors"
-                title="Click to copy secure code"
-              >
-                <Lock size={11} />
-                <span className="tracking-wider">{form.secureCode}</span>
-                <ClipboardCopy size={11} className="text-inquest-ink-soft" />
-              </button>
-            )}
-
-            {/* Privacy toggle */}
-            <div className="flex items-center bg-inquest-base rounded-full p-1 border border-inquest-rule">
-              <button
-                onClick={() => { if (isPrivate) handleTogglePrivacy(); }}
-                disabled={updateForm.isPending || updateSecureCode.isPending}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                  !isPrivate ? 'bg-inquest-surface shadow text-inquest-ink' : 'text-inquest-ink-soft hover:text-inquest-ink'
-                }`}
-              >
-                <Globe size={13} /> Public
-              </button>
-              <button
-                onClick={() => { if (!isPrivate) handleTogglePrivacy(); }}
-                disabled={updateForm.isPending || updateSecureCode.isPending}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                  isPrivate ? 'bg-inquest-surface shadow text-inquest-ink' : 'text-inquest-ink-soft hover:text-inquest-ink'
-                }`}
-              >
-                <Lock size={13} /> Private
-              </button>
-            </div>
+            {/* Responses Button */}
+            <Link
+              href={`/dashboard/forms/${formId}/responses`}
+              className="flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-inquest-depth hover:bg-inquest-surface border border-inquest-rule text-sm font-medium text-inquest-ink transition-colors mr-2"
+            >
+              <Users size={14} className="text-inquest-accent" />
+              <span>Responses</span>
+              {submissionCount?.count !== undefined && submissionCount.count > 0 && (
+                <span className="bg-inquest-accent text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold ml-1">
+                  {submissionCount.count}
+                </span>
+              )}
+            </Link>
 
             <button onClick={copyShareLink} className="p-2 text-inquest-ink-soft hover:text-inquest-ink rounded-full transition-colors" title="Copy share link">
               <Copy size={17} />
             </button>
             <button
+              onClick={() => setShowSettingsModal(true)}
+              className="p-2 text-inquest-ink-soft hover:text-inquest-ink rounded-full transition-colors"
+              title="Settings"
+            >
+              <Settings size={17} />
+            </button>
+            <button
               onClick={handleSave}
               disabled={updateForm.isPending}
-              className="flex items-center gap-1.5 bg-inquest-accent text-white px-5 py-2 rounded-full font-medium hover:bg-inquest-accent-soft transition-colors terracotta-glow disabled:opacity-50 text-sm"
+              className="flex items-center gap-1.5 bg-inquest-accent text-white px-5 py-2 rounded-full font-medium hover:bg-inquest-accent-soft transition-colors terracotta-glow disabled:opacity-50 text-sm ml-1"
             >
               <Save size={15} />
               <span className="hidden sm:inline">{updateForm.isPending ? 'Saving...' : 'Save Changes'}</span>
-            </button>
-
-            <button
-              onClick={() => setShowDeleteConfirm(true)}
-              className="p-2 text-inquest-ink-ghost hover:text-inquest-caution hover:bg-red-50 rounded-full transition-colors"
-              title="Delete"
-            >
-              <Trash2 size={17} />
             </button>
           </div>
         </div>
@@ -570,47 +535,171 @@ export default function FormBuilderPage() {
         )}
       </AnimatePresence>
 
+      {/* Settings Modal */}
+      <AnimatePresence>
+        {showSettingsModal && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4"
+            onClick={() => setShowSettingsModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-inquest-surface rounded-3xl p-6 md:p-8 max-w-lg w-full warm-shadow relative overflow-hidden"
+            >
+              <button onClick={() => setShowSettingsModal(false)} className="absolute top-6 right-6 text-inquest-ink-ghost hover:text-inquest-ink">✕</button>
+              
+              <div className="flex items-center gap-3 mb-8">
+                <div className="w-10 h-10 bg-inquest-accent/10 rounded-full flex items-center justify-center">
+                  <Settings size={20} className="text-inquest-accent" />
+                </div>
+                <h3 className="text-2xl font-serif text-inquest-ink">Form Settings</h3>
+              </div>
+              
+              <div className="space-y-6">
+                {/* Status Toggle */}
+                <div className="bg-inquest-base p-4 rounded-2xl border border-inquest-rule flex items-center justify-between">
+                  <div>
+                    <h4 className="font-medium text-inquest-ink text-sm">Accept Responses</h4>
+                    <p className="text-xs text-inquest-ink-soft mt-0.5">Allow users to submit new responses.</p>
+                  </div>
+                  <div className="flex items-center bg-inquest-surface rounded-full p-1 border border-inquest-rule/50 shadow-sm">
+                    <button
+                      onClick={() => setIsOpenForSubmission(true)}
+                      className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all ${
+                        isOpenForSubmission ? 'bg-inquest-sage/20 text-inquest-sage shadow-sm border border-inquest-sage/30' : 'text-inquest-ink-soft hover:text-inquest-ink'
+                      }`}
+                    >
+                      Open
+                    </button>
+                    <button
+                      onClick={() => setIsOpenForSubmission(false)}
+                      className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all ${
+                        !isOpenForSubmission ? 'bg-inquest-caution/10 text-inquest-caution shadow-sm border border-inquest-caution/30' : 'text-inquest-ink-soft hover:text-inquest-ink'
+                      }`}
+                    >
+                      Closed
+                    </button>
+                  </div>
+                </div>
+
+                {/* Privacy Toggle */}
+                <div className="bg-inquest-base p-4 rounded-2xl border border-inquest-rule flex flex-col gap-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-medium text-inquest-ink text-sm">Form Privacy</h4>
+                      <p className="text-xs text-inquest-ink-soft mt-0.5">Control who can access the form.</p>
+                    </div>
+                    <div className="flex items-center bg-inquest-surface rounded-full p-1 border border-inquest-rule/50 shadow-sm">
+                      <button
+                        onClick={() => { if (isPrivate) handleTogglePrivacy(); }}
+                        disabled={updateForm.isPending || updateSecureCode.isPending}
+                        className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all ${
+                          !isPrivate ? 'bg-inquest-surface shadow text-inquest-ink border border-inquest-rule' : 'text-inquest-ink-soft hover:text-inquest-ink'
+                        }`}
+                      >
+                        Public
+                      </button>
+                      <button
+                        onClick={() => { if (!isPrivate) handleTogglePrivacy(); }}
+                        disabled={updateForm.isPending || updateSecureCode.isPending}
+                        className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all ${
+                          isPrivate ? 'bg-inquest-surface shadow text-inquest-ink border border-inquest-rule' : 'text-inquest-ink-soft hover:text-inquest-ink'
+                        }`}
+                      >
+                        Private
+                      </button>
+                    </div>
+                  </div>
+                  {isPrivate && (
+                    <div className="bg-inquest-surface rounded-xl p-3 border border-inquest-rule/50 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <Lock size={14} className="text-inquest-ink-ghost" />
+                        <span className="text-sm font-mono text-inquest-ink font-medium tracking-widest">{form.secureCode}</span>
+                      </div>
+                      <button onClick={copySecureCode} className="text-xs text-inquest-accent font-medium hover:underline">Copy Code</button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Require Login Toggle */}
+                <div className="bg-inquest-base p-4 rounded-2xl border border-inquest-rule flex items-center justify-between">
+                  <div>
+                    <h4 className="font-medium text-inquest-ink text-sm">Require Login</h4>
+                    <p className="text-xs text-inquest-ink-soft mt-0.5">Users must log in to submit a response.</p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" className="sr-only peer" checked={requiresAuth} onChange={(e) => setRequiresAuth(e.target.checked)} />
+                    <div className="w-11 h-6 bg-inquest-depth peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-inquest-accent"></div>
+                  </label>
+                </div>
+
+                {/* Danger Zone */}
+                <div className="pt-2">
+                  <button
+                    onClick={() => {
+                      setShowSettingsModal(false);
+                      setShowDeleteConfirm(true);
+                    }}
+                    className="w-full py-3 rounded-xl border border-inquest-caution/30 text-inquest-caution font-medium hover:bg-inquest-caution hover:text-white transition-colors text-sm"
+                  >
+                    Delete Form
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Main Workspace */}
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
         {/* Canvas */}
         <div className="flex-1 overflow-y-auto p-6 sm:p-12 bg-inquest-base pb-32">
           <div className="max-w-3xl mx-auto space-y-4">
-            <AnimatePresence>
-              {fields.map((field, idx) => (
-                <motion.div
-                  key={idx}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  onClick={() => { setSelectedFieldIndex(idx); setShowMobileSidebar(true); }}
-                  className={`bg-inquest-surface p-5 sm:p-6 rounded-3xl cursor-pointer transition-all border ${
-                    selectedFieldIndex === idx
-                      ? 'border-inquest-accent warm-shadow scale-[1.01]'
-                      : 'border-inquest-rule/50 hover:border-inquest-rule'
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        <span className="text-xs font-bold text-inquest-ink-soft uppercase tracking-wider">Q{idx + 1}</span>
-                        {field.required && (
-                          <span className="text-xs text-inquest-caution font-medium bg-inquest-caution/10 px-2 py-0.5 rounded-full">Required</span>
-                        )}
+            <Reorder.Group axis="y" values={fields} onReorder={handleReorder} className="space-y-4">
+              <AnimatePresence>
+                {fields.map((field, idx) => (
+                  <Reorder.Item
+                    key={field.localId}
+                    value={field}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    onClick={() => { setSelectedFieldIndex(idx); setShowMobileSidebar(true); }}
+                    className={`bg-inquest-surface p-5 sm:p-6 rounded-3xl cursor-pointer transition-all border group ${
+                      selectedFieldIndex === idx
+                        ? 'border-inquest-accent warm-shadow scale-[1.01]'
+                        : 'border-inquest-rule/50 hover:border-inquest-rule'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-3 flex-1 min-w-0">
+                        <div className="mt-1 cursor-grab active:cursor-grabbing text-inquest-ink-ghost hover:text-inquest-ink-soft transition-colors shrink-0">
+                          <GripVertical size={20} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <span className="text-xs font-bold text-inquest-ink-soft uppercase tracking-wider">Q{idx + 1}</span>
+                            {field.required && (
+                              <span className="text-xs text-inquest-caution font-medium bg-inquest-caution/10 px-2 py-0.5 rounded-full">Required</span>
+                            )}
+                          </div>
+                          <h3 className="text-lg font-serif text-inquest-ink break-words">{field.label || 'Untitled'}</h3>
+                          <p className="text-inquest-ink-soft mt-0.5 italic text-xs">
+                            {FIELD_TYPES.find(t => t.type === field.type)?.label}
+                          </p>
+                        </div>
                       </div>
-                      <h3 className="text-lg font-serif text-inquest-ink break-words">{field.label || 'Untitled'}</h3>
-                      <p className="text-inquest-ink-soft mt-0.5 italic text-xs">
-                        {FIELD_TYPES.find(t => t.type === field.type)?.label}
-                      </p>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button onClick={(e) => removeField(idx, e)} className="p-2 text-inquest-ink-soft hover:text-inquest-caution hover:bg-red-50 rounded-full ml-1"><Trash2 size={16} /></button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <button onClick={(e) => moveField(idx, 'up', e)} disabled={idx === 0} className="p-1.5 text-inquest-ink-soft hover:text-inquest-ink hover:bg-inquest-depth rounded-full disabled:opacity-30"><ArrowUp size={13} /></button>
-                      <button onClick={(e) => moveField(idx, 'down', e)} disabled={idx === fields.length - 1} className="p-1.5 text-inquest-ink-soft hover:text-inquest-ink hover:bg-inquest-depth rounded-full disabled:opacity-30"><ArrowDown size={13} /></button>
-                      <button onClick={(e) => removeField(idx, e)} className="p-1.5 text-inquest-ink-soft hover:text-inquest-caution hover:bg-red-50 rounded-full ml-1"><Trash2 size={13} /></button>
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
-            </AnimatePresence>
+                  </Reorder.Item>
+                ))}
+              </AnimatePresence>
+            </Reorder.Group>
 
             {fields.length === 0 && (
               <div className="text-center py-16 bg-inquest-surface border border-inquest-rule border-dashed rounded-3xl">

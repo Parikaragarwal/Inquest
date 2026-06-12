@@ -14,6 +14,25 @@ export const router = tRPCContext.router;
 
 export const publicProcedure = tRPCContext.procedure;
 
+export const optionalAuthenticatedProcedure = tRPCContext.procedure.use(
+  async ({ ctx, next }) => {
+    const token = getAuthenticationCookie(ctx);
+    if (!token) return next({ ctx });
+    try {
+      const { id } = await userService.verifyAndDecodeUserToken(token);
+      if (!id) return next({ ctx });
+      return next({
+        ctx: {
+          ...ctx,
+          user: { id },
+        },
+      });
+    } catch {
+      return next({ ctx });
+    }
+  }
+);
+
 export const authenticatedProcedure = tRPCContext.procedure.use(
   async ({ ctx, next }) => {
     const token = getAuthenticationCookie(ctx);

@@ -1,0 +1,1 @@
+ALTER TABLE "forms" ADD COLUMN "requires_auth" boolean DEFAULT true NOT NULL;

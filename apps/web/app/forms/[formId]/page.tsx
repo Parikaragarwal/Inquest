@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import { trpc } from '~/trpc/client';
 import { motion } from 'framer-motion';
@@ -48,6 +48,8 @@ export default function PublicFormSubmissionPage() {
   const [multiSelectAnswers, setMultiSelectAnswers] = useState<Record<string, string[]>>({});
   const [phoneCountryCodes, setPhoneCountryCodes] = useState<Record<string, string>>({});
   const [codeInputValue, setCodeInputValue] = useState('');
+  const [honeypot, setHoneypot] = useState('');
+  const [isBotSuccess, setIsBotSuccess] = useState(false);
 
   const { data: form, isLoading: isFormLoading, error: formError } = trpc.form.getFormForSubmission.useQuery(
     { formId, secureCode: secureCode || undefined },
@@ -69,6 +71,31 @@ export default function PublicFormSubmissionPage() {
       toast.error(err.message || 'Failed to submit response');
     }
   });
+
+  // Pre-fill answers for logged-in users
+  useEffect(() => {
+    if (form && user && isSignedIn) {
+      setAnswers((prev) => {
+        const next = { ...prev };
+        let hasChanges = false;
+        
+        (form.fields as any[]).forEach((field) => {
+          const fid = field.id as string;
+          if (!next[fid]) { // Only prefill if currently empty
+            if (field.type === 'email' && user.email) {
+              next[fid] = user.email;
+              hasChanges = true;
+            } else if (field.type === 'text' && field.label.toLowerCase().includes('name') && user.name) {
+              next[fid] = user.name;
+              hasChanges = true;
+            }
+          }
+        });
+        
+        return hasChanges ? next : prev;
+      });
+    }
+  }, [form, user, isSignedIn]);
 
   const isMissingCodeError = formError?.message?.toLowerCase().includes('secure code');
 
@@ -129,7 +156,7 @@ export default function PublicFormSubmissionPage() {
   }
 
   // 2. Unauthenticated Gate
-  if (!isSignedIn) {
+  if (form?.requiresAuth && !isSignedIn) {
     return (
       <div className="min-h-screen bg-inquest-base flex items-center justify-center px-4">
         <motion.div
@@ -155,8 +182,8 @@ export default function PublicFormSubmissionPage() {
     );
   }
 
-  // 3. Already Submitted
-  if (checkSubmission?.hasSubmitted || submitForm.isSuccess) {
+  // 3. Already Submitted or Bot Success
+  if (checkSubmission?.hasSubmitted || submitForm.isSuccess || isBotSuccess) {
     return (
       <div className="min-h-screen bg-inquest-base flex items-center justify-center px-4">
         <motion.div
@@ -184,6 +211,12 @@ export default function PublicFormSubmissionPage() {
   // Build submit payload
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (honeypot) {
+      // It's a bot. Silently drop the submission and show success UI.
+      setIsBotSuccess(true);
+      return;
+    }
 
     const payload: { formFieldId: string; answer: string }[] = [];
 
@@ -488,6 +521,20 @@ export default function PublicFormSubmissionPage() {
               )}
             </motion.div>
           ))}
+
+          {/* HONEYPOT FIELD (Anti-Spam) */}
+          <div style={{ opacity: 0, position: 'absolute', top: 0, left: 0, height: 0, width: 0, zIndex: -1 }} aria-hidden="true">
+            <label htmlFor="website_url_honey">Please leave this field blank</label>
+            <input
+              type="text"
+              id="website_url_honey"
+              name="website_url_honey"
+              tabIndex={-1}
+              autoComplete="off"
+              value={honeypot}
+              onChange={(e) => setHoneypot(e.target.value)}
+            />
+          </div>
 
           <div className="pt-6 pb-20">
             <button

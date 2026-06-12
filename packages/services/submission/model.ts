@@ -6,14 +6,14 @@ export const answerInput = z.object({
 });
 
 export const submitFormInput = z.object({
-  userId: z.string().uuid(),
+  userId: z.string().uuid().optional(),
   formId: z.string().uuid(),
   secureCode: z.string().optional().nullable(),
   answers: z.array(answerInput).min(1, "At least one answer is required"),
 });
 
 export const checkUserSubmissionInput = z.object({
-  userId: z.string().uuid(),
+  userId: z.string().uuid().optional(),
   formId: z.string().uuid(),
 });
 

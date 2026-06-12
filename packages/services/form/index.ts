@@ -82,6 +82,7 @@ class FormService {
           description: input.description ?? null,
           secureCode: input.secureCode ?? null,
           isOpenForSubmission: input.isOpenForSubmission,
+          requiresAuth: input.requiresAuth,
           createdBy: input.userId,
         })
         .returning({ id: formsTable.id });
@@ -152,6 +153,8 @@ class FormService {
         updateData.secureCode = input.secureCode;
       if (input.isOpenForSubmission !== undefined)
         updateData.isOpenForSubmission = input.isOpenForSubmission;
+      if (input.requiresAuth !== undefined)
+        updateData.requiresAuth = input.requiresAuth;
 
       if (Object.keys(updateData).length > 0) {
         await tx
@@ -324,12 +327,12 @@ class FormService {
       .where(eq(formFieldTable.formId, form.id))
       .orderBy(asc(formFieldTable.orderIndex));
 
-    // Return render-safe data — no createdBy, no secureCode
     return {
       id: form.id,
       title: form.title,
       description: form.description,
       isOpenForSubmission: form.isOpenForSubmission,
+      requiresAuth: form.requiresAuth,
       fields,
     };
   }
