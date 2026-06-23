@@ -1,23 +1,61 @@
 @import "tailwindcss";
 
-@theme {
-  --color-inquest-base: #EADFC8;
-  --color-inquest-surface: #F2E9D8;
-  --color-inquest-depth: #DFD3BB;
+:root {
+  --color-inquest-base: #F5EFEB; /* Creamy warm base */
+  --color-inquest-surface: #FCFAF8; /* Soft warm white */
+  --color-inquest-depth: #EBE0D8; /* Cream/brown depth shadow */
+  --color-inquest-rule: #DFD0C4; /* Soft brown-cream line */
   
-  --color-inquest-rule: #D1C3A9;
+  --color-inquest-ink: #3A2312; /* Deep dark coffee/brown */
+  --color-inquest-ink-mid: #5B402B; /* Medium dark coffee */
+  --color-inquest-ink-soft: #856953; /* Light warm brown */
+  --color-inquest-ink-ghost: #BCAE9F; /* Very soft cream-ink */
   
-  --color-inquest-ink: #3E2723;
-  --color-inquest-ink-mid: #5D4037;
-  --color-inquest-ink-soft: #8D6E63;
-  --color-inquest-ink-ghost: #BCAAA4;
+  --color-inquest-accent: #C85A17; /* Earthy terracotta orange */
+  --color-inquest-accent-soft: #DC6B27;
+  --color-inquest-accent-pale: #FDF4ED;
   
-  --color-inquest-accent: #D87040;
-  --color-inquest-accent-soft: #E08A63;
-  --color-inquest-accent-pale: #FBE6DC;
-  
-  --color-inquest-sage: #E5A93C;
+  --color-inquest-sage: #D29416;
   --color-inquest-caution: #C62828;
+}
+
+.dark {
+  --color-inquest-base: #0B0705; /* Void black */
+  --color-inquest-surface: #130D0B; /* Shiny black card */
+  --color-inquest-depth: #1A130F; /* Shiny black depth shadow */
+  --color-inquest-rule: #2D1D16; /* Glowing dark orange-brown lines */
+  
+  --color-inquest-ink: #F2EBE5; /* Soft warm paper white */
+  --color-inquest-ink-mid: #D9CFC6; /* Soft warm cream-gray */
+  --color-inquest-ink-soft: #A39387; /* Muted warm gray */
+  --color-inquest-ink-ghost: #5C4D44; /* Dark muted brown-black */
+  
+  --color-inquest-accent: #E06F28; /* Terracotta orange glow */
+  --color-inquest-accent-soft: #F98740;
+  --color-inquest-accent-pale: #1E120A;
+  
+  --color-inquest-sage: #F2B024;
+  --color-inquest-caution: #EF5350;
+}
+
+@theme {
+  --color-inquest-base: var(--color-inquest-base);
+  --color-inquest-surface: var(--color-inquest-surface);
+  --color-inquest-depth: var(--color-inquest-depth);
+  
+  --color-inquest-rule: var(--color-inquest-rule);
+  
+  --color-inquest-ink: var(--color-inquest-ink);
+  --color-inquest-ink-mid: var(--color-inquest-ink-mid);
+  --color-inquest-ink-soft: var(--color-inquest-ink-soft);
+  --color-inquest-ink-ghost: var(--color-inquest-ink-ghost);
+  
+  --color-inquest-accent: var(--color-inquest-accent);
+  --color-inquest-accent-soft: var(--color-inquest-accent-soft);
+  --color-inquest-accent-pale: var(--color-inquest-accent-pale);
+  
+  --color-inquest-sage: var(--color-inquest-sage);
+  --color-inquest-caution: var(--color-inquest-caution);
 
   --font-serif: var(--font-playfair);
   --font-sans: var(--font-inter);

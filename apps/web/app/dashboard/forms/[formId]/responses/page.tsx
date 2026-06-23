@@ -3,9 +3,10 @@
 import { useParams, useRouter } from 'next/navigation';
 import { trpc } from '~/trpc/client';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Users, BarChart3, ChevronDown, ChevronUp, MessageSquare } from 'lucide-react';
+import { ArrowLeft, Users, BarChart3, ChevronDown, ChevronUp, MessageSquare, FileSpreadsheet } from 'lucide-react';
 import { useState } from 'react';
 import Link from 'next/link';
+import { toast } from 'sonner';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
 
 const CHART_COLORS = ['#f43f5e', '#8b5cf6', '#0ea5e9', '#10b981', '#f59e0b', '#ec4899', '#14b8a6', '#6366f1'];
@@ -33,6 +34,45 @@ export default function FormResponsesPage() {
   const [expandedSubmission, setExpandedSubmission] = useState<string | null>(null);
 
   const isLoading = isFormLoading || isResponsesLoading || isAnalyticsLoading;
+
+  const exportToCSV = () => {
+    if (!responses || responses.length === 0 || !form) return;
+
+    // Get all form fields to use as columns
+    const columns = form.fields.map((f) => ({
+      id: f.id,
+      label: f.label,
+    }));
+
+    // Header row
+    const headers = ["Submitter ID", ...columns.map((c) => c.label)];
+
+    // Data rows
+    const rows = responses.map((sub, idx) => {
+      const answerMap = new Map(sub.answers.map((a) => [a.formFieldId, a.answer]));
+      return [
+        `Respondent #${idx + 1}`,
+        ...columns.map((c) => {
+          const ans = answerMap.get(c.id) ?? "";
+          // Escape quotes and commas in CSV cells
+          return `"${ans.replace(/"/g, '""')}"`;
+        }),
+      ];
+    });
+
+    const csvContent = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const trigger = document.createElement("a");
+    trigger.href = url;
+    trigger.download = `${form.title.toLowerCase().replace(/\s+/g, "-")}-responses.csv`;
+    document.body.appendChild(trigger);
+    trigger.click();
+    document.body.removeChild(trigger);
+    URL.revokeObjectURL(url);
+    toast.success("CSV Export downloaded!");
+  };
 
   if (isLoading) {
     return (
@@ -63,12 +103,22 @@ export default function FormResponsesPage() {
           <h1 className="text-3xl font-serif text-inquest-ink truncate">{form.title}</h1>
           <p className="text-inquest-ink-soft mt-1">Responses & Analytics</p>
         </div>
-        <Link
-          href={`/dashboard/forms/${formId}`}
-          className="px-5 py-2.5 rounded-full border border-inquest-rule text-inquest-ink-mid hover:bg-inquest-depth/30 transition-colors font-medium text-sm self-start sm:self-center"
-        >
-          ← Back to Builder
-        </Link>
+        <div className="flex items-center gap-2 self-start sm:self-center">
+          <button
+            onClick={exportToCSV}
+            disabled={!responses || responses.length === 0}
+            className="flex items-center gap-1.5 px-4 py-2.5 rounded-full bg-inquest-accent text-white hover:bg-inquest-accent-soft transition-colors font-medium text-sm terracotta-glow disabled:opacity-50 cursor-pointer"
+          >
+            <FileSpreadsheet size={16} />
+            <span>Export CSV</span>
+          </button>
+          <Link
+            href={`/dashboard/forms/${formId}`}
+            className="px-5 py-2.5 rounded-full border border-inquest-rule text-inquest-ink-mid hover:bg-inquest-depth/30 transition-colors font-medium text-sm"
+          >
+            ← Back to Builder
+          </Link>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -104,14 +154,48 @@ export default function FormResponsesPage() {
         </div>
       </div>
 
-      {/* Field Analytics powered by Recharts */}
+      {/* Submission Timeline Chart */}
+      {analytics?.timeline && analytics.timeline.length > 0 && (
+        <div className="bg-inquest-surface p-6 rounded-3xl border border-inquest-rule/50 warm-shadow">
+          <div className="mb-4">
+            <h2 className="text-xl font-serif text-inquest-ink font-bold">Submission Timeline</h2>
+            <p className="text-xs text-inquest-ink-soft">Track response rates over time</p>
+          </div>
+          <div className="h-64 w-full pt-4">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={analytics.timeline} margin={{ top: 0, right: 10, left: -20, bottom: 0 }}>
+                <XAxis 
+                  dataKey="date" 
+                  tick={{ fontSize: 12, fill: '#888' }} 
+                  axisLine={false} 
+                  tickLine={false} 
+                />
+                <YAxis 
+                  tick={{ fontSize: 12, fill: '#888' }} 
+                  axisLine={false} 
+                  tickLine={false} 
+                  allowDecimals={false}
+                />
+                <RechartsTooltip 
+                  cursor={{ fill: 'rgba(0,0,0,0.03)' }} 
+                  formatter={(value: number) => [`${value} submissions`, 'Count']}
+                  contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)' }}
+                />
+                <Bar dataKey="count" fill="#D87040" radius={[6, 6, 0, 0]} maxBarSize={40} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
+
+      {/* Field Analytics */}
       {analytics && analytics.fieldAnalytics.length > 0 && (
         <section>
           <h2 className="text-sm font-medium text-inquest-ink-soft mb-4 uppercase tracking-widest pl-2">Data Insights</h2>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {analytics.fieldAnalytics.map((field) => {
-              const entries = Object.entries(field.valueCounts).sort((a, b) => b[1] - a[1]);
-              const chartData = entries.map(([name, value]) => ({ name, value }));
+            {analytics.fieldAnalytics.map((field: any) => {
+              const entries = Object.entries(field.valueCounts).sort((a: any, b: any) => b[1] - a[1]);
+              const chartData = entries.map(([name, value]) => ({ name, value: Number(value) }));
 
               return (
                 <div key={field.fieldId} className="bg-inquest-surface p-6 rounded-3xl border border-inquest-rule/50 warm-shadow">
@@ -119,6 +203,23 @@ export default function FormResponsesPage() {
                     <h3 className="font-serif text-xl text-inquest-ink mb-1">{field.label}</h3>
                     <p className="text-xs text-inquest-ink-ghost uppercase tracking-wider">{field.type.replace('_', ' ')} • {field.answerCount} answers</p>
                   </div>
+
+                  {field.stats && (
+                    <div className="grid grid-cols-3 gap-3 mb-6 bg-inquest-base p-4 rounded-2xl border border-inquest-rule/40 text-center">
+                      <div>
+                        <span className="text-[10px] uppercase tracking-wider text-inquest-ink-soft">Min</span>
+                        <p className="text-lg font-serif font-bold text-inquest-ink">{field.stats.min}</p>
+                      </div>
+                      <div>
+                        <span className="text-[10px] uppercase tracking-wider text-inquest-ink-soft">Average</span>
+                        <p className="text-lg font-serif font-bold text-inquest-accent">{field.stats.average}</p>
+                      </div>
+                      <div>
+                        <span className="text-[10px] uppercase tracking-wider text-inquest-ink-soft">Max</span>
+                        <p className="text-lg font-serif font-bold text-inquest-ink">{field.stats.max}</p>
+                      </div>
+                    </div>
+                  )}
                   
                   {entries.length === 0 ? (
                     <div className="h-40 flex items-center justify-center border border-dashed border-inquest-rule rounded-2xl">
@@ -197,7 +298,7 @@ export default function FormResponsesPage() {
                         <div key={value} className="bg-inquest-base p-4 rounded-2xl flex items-start justify-between gap-4 border border-inquest-rule/30">
                           <span className="text-inquest-ink text-sm break-words leading-relaxed">&ldquo;{value}&rdquo;</span>
                           <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full bg-inquest-depth text-inquest-ink-soft text-xs font-semibold shrink-0">
-                            ×{count}
+                            ×{Number(count)}
                           </span>
                         </div>
                       ))}
@@ -242,7 +343,7 @@ export default function FormResponsesPage() {
                   >
                     <button
                       onClick={() => setExpandedSubmission(isExpanded ? null : submission.submitterId)}
-                      className="w-full flex items-center justify-between p-6 text-left hover:bg-inquest-depth/20 transition-colors"
+                      className="w-full flex items-center justify-between p-6 text-left hover:bg-inquest-depth/20 transition-colors cursor-pointer"
                     >
                       <div className="flex items-center gap-4">
                         <div className="w-10 h-10 rounded-full bg-inquest-accent/10 flex items-center justify-center text-inquest-accent font-serif font-bold text-lg">

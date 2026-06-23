@@ -4,7 +4,7 @@ import { useGetuser } from '~/hooks/api/auth';
 import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { LogOut, LayoutDashboard, Library, Menu, X, UserCog } from 'lucide-react';
+import { LogOut, LayoutDashboard, Palette, Menu, X, UserCog } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { trpc } from '~/trpc/client';
 import { toast } from 'sonner';
@@ -67,7 +67,7 @@ export default function DashboardLayout({
 
   const navLinks = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, active: pathname === '/dashboard' },
-    { href: '/dashboard/philosophy', label: 'Philosophy', icon: Library, active: pathname === '/dashboard/philosophy' },
+    { href: '/dashboard/styling', label: 'Styling Guide', icon: Palette, active: pathname === '/dashboard/styling' },
   ];
 
   const SidebarContent = () => (

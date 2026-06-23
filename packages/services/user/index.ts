@@ -1,141 +1,328 @@
-import {db,eq} from '@repo/database'
-import {usersTable} from '@repo/database/models/user'
-import {randomBytes,createHmac} from 'node:crypto'
-import { type CreateUserWithEmailAndPasswordType,
-   createUserWithEmailAndPasswordInput,
-   generateUserTokenPayload, 
-   GenerateUserTokenPayloadType,  
-   signInUserWithEmailAndPasswordInput,  
-   SignInUserWithEmailAndPasswordType} from "./model";
-import * as JWT from 'jsonwebtoken'
-import { env } from '../env';
+import { db, eq } from "@repo/database";
+import { usersTable } from "@repo/database/models/user";
+import { otpsTable } from "@repo/database/models/otp";
+import { randomBytes, createHmac } from "node:crypto";
+import {
+  type CreateUserWithEmailAndPasswordType,
+  createUserWithEmailAndPasswordInput,
+  generateUserTokenPayload,
+  type GenerateUserTokenPayloadType,
+  signInUserWithEmailAndPasswordInput,
+  type SignInUserWithEmailAndPasswordType,
+  type VerifyOTPInputType,
+  verifyOTPInput,
+  type ResendOTPInputType,
+  resendOTPInput,
+  type ForgotPasswordInputType,
+  forgotPasswordInput,
+  type ResetPasswordInputType,
+  resetPasswordInput,
+} from "./model";
+import * as JWT from "jsonwebtoken";
+import { env } from "../env";
+import { googleOAuth2Client } from "../clients/google-oauth";
+import { sendOTPEmail } from "../clients/resend";
 
 class UserService {
-
-  private async generateHash(salt:string,password:string){
-    return createHmac('sha256',salt).update(password).digest('hex');
+  private async generateHash(salt: string, password: string) {
+    return createHmac("sha256", salt).update(password).digest("hex");
   }
 
-  private async getUserInfoById(id:string){
-    const user = await db.select({
-      id:usersTable.id,
-      email:usersTable.email,
-      fullName: usersTable.fullName,
-      profileImageUrl: usersTable.profileImageUrl,
-    }).from(usersTable).where(eq(usersTable.id,id));
+  private async getUserInfoById(id: string) {
+    const user = await db
+      .select({
+        id: usersTable.id,
+        email: usersTable.email,
+        fullName: usersTable.fullName,
+        profileImageUrl: usersTable.profileImageUrl,
+      })
+      .from(usersTable)
+      .where(eq(usersTable.id, id));
 
-    if(!user || user.length===0) throw new Error('User not found');
+    if (!user || user.length === 0) throw new Error("User not found");
     return user[0];
   }
-   
-  private async getUserByEmail(email:string){
-    const result = await db.select().from(usersTable).where(eq(usersTable.email,email));
-    if(!result || result.length ===0) return null;
+
+  private async getUserByEmail(email: string) {
+    const result = await db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.email, email));
+    if (!result || result.length === 0) return null;
     return result[0];
   }
 
-  private async generateUserToken(payload: GenerateUserTokenPayloadType){
-    const {id} = await generateUserTokenPayload.parseAsync(payload);
-    const token = JWT.sign(
-      {id},
-      env.JWT_SECRET
-    );
-    return {token};
+  private async generateUserToken(payload: GenerateUserTokenPayloadType) {
+    const { id } = await generateUserTokenPayload.parseAsync(payload);
+    const token = JWT.sign({ id }, env.JWT_SECRET);
+    return { token };
   }
 
-  private async verifyUserToken(token:string):Promise<GenerateUserTokenPayloadType>{
+  private async verifyUserToken(token: string): Promise<GenerateUserTokenPayloadType> {
     try {
-      const verificationResult = JWT.verify(token,env.JWT_SECRET) as GenerateUserTokenPayloadType;
+      const verificationResult = JWT.verify(token, env.JWT_SECRET) as GenerateUserTokenPayloadType;
       return verificationResult;
     } catch (error) {
-      throw new Error('Invalid Token');
+      throw new Error("Invalid Token");
     }
-    
   }
 
-  public async createUserWithEmailAndPassword(payload:CreateUserWithEmailAndPasswordType){
-    const {fullName,email,password} = await createUserWithEmailAndPasswordInput.parseAsync(payload);
-    const existingUserWithEmail = await this.getUserByEmail(email);
-    if(existingUserWithEmail){
-      throw new Error('User with given email already exists');
+  private generateNumericOTP(): string {
+    let otp = "";
+    for (let i = 0; i < 6; i++) {
+      otp += Math.floor(Math.random() * 10).toString();
     }
-    const salt = randomBytes(16).toString('hex');
-    const hash =await this.generateHash(salt,password);
+    return otp;
+  }
 
-    const userInsertResult = await db.insert(usersTable).values({email,fullName,password:hash,salt}).returning({
-      id: usersTable.id
+  private async sendAndSaveOTP(email: string, reason: "verify" | "reset"): Promise<string> {
+    const otp = this.generateNumericOTP();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes from now
+
+    // Overwrite previous OTPs for this email address
+    await db.delete(otpsTable).where(eq(otpsTable.email, email));
+
+    // Save fresh code
+    await db.insert(otpsTable).values({
+      email,
+      otp,
+      expiresAt,
     });
-    if(!userInsertResult || userInsertResult.length===0 || !userInsertResult[0]?.id) throw new Error('Error creating a user');
-    const userId =  userInsertResult[0]?.id
-    const {token} = await this.generateUserToken({id:userId})
+
+    const subject = reason === "reset" ? "Reset your Inquest password" : "Verify your Inquest email address";
+    
+    await sendOTPEmail(email, otp, subject);
+    return otp;
+  }
+
+  // ─── Email / Password Credentials Flow ───────────────────
+
+  public async createUserWithEmailAndPassword(payload: CreateUserWithEmailAndPasswordType) {
+    const { fullName, email, password } = await createUserWithEmailAndPasswordInput.parseAsync(payload);
+    const existingUserWithEmail = await this.getUserByEmail(email);
+    if (existingUserWithEmail) {
+      throw new Error("User with given email already exists");
+    }
+
+    const salt = randomBytes(16).toString("hex");
+    const hash = await this.generateHash(salt, password);
+
+    const userInsertResult = await db
+      .insert(usersTable)
+      .values({
+        email,
+        fullName,
+        password: hash,
+        salt,
+        emailVerified: false,
+      })
+      .returning({
+        id: usersTable.id,
+      });
+
+    if (!userInsertResult || userInsertResult.length === 0 || !userInsertResult[0]?.id) {
+      throw new Error("Error creating a user");
+    }
+
+    const userId = userInsertResult[0].id;
+
+    // Generate & send OTP
+    await this.sendAndSaveOTP(email, "verify");
 
     return {
       id: userId,
-      token
-    }
+      email,
+      needsVerification: true,
+    };
   }
 
-  public async signinUserWithEmailAndPassword(payload: SignInUserWithEmailAndPasswordType){
-    const {email,password} = await signInUserWithEmailAndPasswordInput.parseAsync(payload);
+  public async signinUserWithEmailAndPassword(payload: SignInUserWithEmailAndPasswordType) {
+    const { email, password } = await signInUserWithEmailAndPasswordInput.parseAsync(payload);
     const existingUser = await this.getUserByEmail(email);
-    if(!existingUser){
-      throw new Error('Invalid Username or Password');
+    if (!existingUser) {
+      throw new Error("Invalid Username or Password");
     }
-    if(!existingUser.password || !existingUser.salt){
-      throw new Error('Invalid Authentication Method');
+    if (!existingUser.password || !existingUser.salt) {
+      throw new Error("Invalid Authentication Method");
     }
 
-    const hash = await this.generateHash(existingUser.salt,password);
-
-    if(hash!==existingUser.password){
-      throw new Error('Invalid Username or Password');
+    const hash = await this.generateHash(existingUser.salt, password);
+    if (hash !== existingUser.password) {
+      throw new Error("Invalid Username or Password");
     }
 
     const userId = existingUser.id;
 
-    const {token} = await this.generateUserToken({id:userId})
-    return {
-      id:userId,
-      token
+    // Check email verification status
+    if (!existingUser.emailVerified) {
+      // Trigger a fresh OTP automatically on login attempt
+      await this.sendAndSaveOTP(email, "verify");
+      return {
+        id: userId,
+        email,
+        needsVerification: true,
+      };
     }
+
+    const { token } = await this.generateUserToken({ id: userId });
+    return {
+      id: userId,
+      token,
+      needsVerification: false,
+    };
   }
 
-  public async verifyAndDecodeUserToken(token:string){
-    const {id} = await this.verifyUserToken(token);
+  public async verifyAndDecodeUserToken(token: string) {
+    const { id } = await this.verifyUserToken(token);
     const userInfo = await this.getUserInfoById(id);
     return {
-      ...userInfo
+      ...userInfo,
     };
+  }
+
+  // ─── OTP / Verification Handlers ───────────────────────
+
+  public async verifyOTP(payload: VerifyOTPInputType) {
+    const { email, otp } = await verifyOTPInput.parseAsync(payload);
+
+    // Look up OTP
+    const otpRecord = await db
+      .select()
+      .from(otpsTable)
+      .where(eq(otpsTable.email, email));
+
+    if (!otpRecord || otpRecord.length === 0) {
+      throw new Error("Invalid or missing verification code");
+    }
+
+    const record = otpRecord[0]!;
+    if (record.otp !== otp) {
+      throw new Error("Invalid verification code");
+    }
+
+    if (new Date() > new Date(record.expiresAt)) {
+      throw new Error("Verification code has expired");
+    }
+
+    // Clean up OTP record
+    await db.delete(otpsTable).where(eq(otpsTable.email, email));
+
+    // Get user details
+    const user = await this.getUserByEmail(email);
+    if (!user) {
+      throw new Error("User associated with this code was not found");
+    }
+
+    // Set user as verified
+    await db
+      .update(usersTable)
+      .set({ emailVerified: true })
+      .where(eq(usersTable.id, user.id));
+
+    const { token } = await this.generateUserToken({ id: user.id });
+
+    return {
+      id: user.id,
+      token,
+    };
+  }
+
+  public async resendOTP(payload: ResendOTPInputType) {
+    const { email } = await resendOTPInput.parseAsync(payload);
+    const user = await this.getUserByEmail(email);
+    if (!user) {
+      throw new Error("User associated with this email was not found");
+    }
+
+    if (user.emailVerified) {
+      throw new Error("Email address has already been verified");
+    }
+
+    await this.sendAndSaveOTP(email, "verify");
+    return { success: true };
+  }
+
+  public async forgotPassword(payload: ForgotPasswordInputType) {
+    const { email } = await forgotPasswordInput.parseAsync(payload);
+    const user = await this.getUserByEmail(email);
+
+    // For privacy/enumeration security, always return success
+    if (user) {
+      await this.sendAndSaveOTP(email, "reset");
+    }
+
+    return { success: true, email };
+  }
+
+  public async resetPassword(payload: ResetPasswordInputType) {
+    const { email, otp, password } = await resetPasswordInput.parseAsync(payload);
+
+    // Look up OTP
+    const otpRecord = await db
+      .select()
+      .from(otpsTable)
+      .where(eq(otpsTable.email, email));
+
+    if (!otpRecord || otpRecord.length === 0) {
+      throw new Error("Invalid or missing verification code");
+    }
+
+    const record = otpRecord[0]!;
+    if (record.otp !== otp) {
+      throw new Error("Invalid verification code");
+    }
+
+    if (new Date() > new Date(record.expiresAt)) {
+      throw new Error("Verification code has expired");
+    }
+
+    const user = await this.getUserByEmail(email);
+    if (!user) {
+      throw new Error("User associated with this email was not found");
+    }
+
+    const salt = randomBytes(16).toString("hex");
+    const hash = await this.generateHash(salt, password);
+
+    // Update password, salt and verify user email
+    await db
+      .update(usersTable)
+      .set({
+        password: hash,
+        salt,
+        emailVerified: true,
+      })
+      .where(eq(usersTable.id, user.id));
+
+    // Delete OTP record
+    await db.delete(otpsTable).where(eq(otpsTable.email, email));
+
+    return { success: true };
   }
 
   // ─── Google OAuth ────────────────────────────────────
 
   public generateGoogleOAuthUrl() {
-    const { googleOAuth2Client } = require('../clients/google-oauth');
-    
-    // Fallback if client is missing credentials (e.g. env vars not set)
     if (!env.GOOGLE_OAUTH_CLIENT_ID) {
       throw new Error("Google OAuth is not configured");
     }
 
     return googleOAuth2Client.generateAuthUrl({
-      access_type: 'offline',
-      scope: ['openid', 'email', 'profile'],
-      response_type: 'code',
-      prompt: 'consent'
+      access_type: "offline",
+      scope: ["openid", "email", "profile"],
+      response_type: "code",
+      prompt: "consent",
     });
   }
 
   public async signInWithGoogleAuthorizationCode(payload: { code: string }) {
-    const { googleOAuth2Client } = require('../clients/google-oauth');
-
     if (!env.GOOGLE_OAUTH_CLIENT_ID) {
       throw new Error("Google OAuth is not configured");
     }
 
     // Exchange code for tokens
     const { tokens } = await googleOAuth2Client.getToken(payload.code);
-    
+
     if (!tokens.id_token) {
       throw new Error("No ID token received from Google");
     }
@@ -153,7 +340,7 @@ class UserService {
 
     const user = await this.findOrCreateGoogleUser({
       email: payloadProfile.email,
-      name: payloadProfile.name || payloadProfile.email.split('@')[0] || 'User',
+      name: payloadProfile.name || payloadProfile.email.split("@")[0] || "User",
       picture: payloadProfile.picture || null,
       email_verified: payloadProfile.email_verified || false,
     });
@@ -162,7 +349,7 @@ class UserService {
 
     return {
       id: user.id,
-      token
+      token,
     };
   }
 
@@ -175,50 +362,52 @@ class UserService {
     const existingUser = await this.getUserByEmail(profile.email);
 
     if (existingUser) {
-      // Set emailVerified = true, update avatar if empty
       const updateData: any = { emailVerified: true };
       if (!existingUser.profileImageUrl && profile.picture) {
         updateData.profileImageUrl = profile.picture;
       }
-      
-      await db.update(usersTable)
+
+      await db
+        .update(usersTable)
         .set(updateData)
         .where(eq(usersTable.id, existingUser.id));
 
       return existingUser;
     } else {
-      // Create new user with null password/salt
-      const userInsertResult = await db.insert(usersTable).values({
-        email: profile.email,
-        fullName: profile.name,
-        profileImageUrl: profile.picture,
-        emailVerified: true,
-        password: null,
-        salt: null,
-      }).returning({
-        id: usersTable.id
-      });
+      const userInsertResult = await db
+        .insert(usersTable)
+        .values({
+          email: profile.email,
+          fullName: profile.name,
+          profileImageUrl: profile.picture,
+          emailVerified: true,
+          password: null,
+          salt: null,
+        })
+        .returning({
+          id: usersTable.id,
+        });
 
       if (!userInsertResult || userInsertResult.length === 0 || !userInsertResult[0]?.id) {
-        throw new Error('Error creating a user from Google profile');
+        throw new Error("Error creating a user from Google profile");
       }
 
       return {
-        id: userInsertResult[0].id
+        id: userInsertResult[0].id,
       };
     }
   }
 
   public async updateProfile(payload: { userId: string; fullName: string }) {
     if (!payload.fullName || payload.fullName.trim().length === 0) {
-      throw new Error('Full name cannot be empty');
+      throw new Error("Full name cannot be empty");
     }
-    await db.update(usersTable)
+    await db
+      .update(usersTable)
       .set({ fullName: payload.fullName.trim() })
       .where(eq(usersTable.id, payload.userId));
     return this.getUserInfoById(payload.userId);
   }
-
 }
 
 export default UserService;

@@ -70,8 +70,8 @@ class SubmissionService {
       }
 
       // Check secure code
-      if (form.secureCode !== null) {
-        if (!input.secureCode || input.secureCode !== form.secureCode) {
+      if (form.secureCode) {
+        if (!input.secureCode || input.secureCode.trim().toUpperCase() !== form.secureCode.trim().toUpperCase()) {
           throw new Error("Invalid or missing secure code");
         }
       }
@@ -353,8 +353,6 @@ class SubmissionService {
     };
   }
 
-  // ─── Basic Submission Analytics (Owner) ─────────────
-
   public async getBasicSubmissionAnalytics(
     payload: GetBasicSubmissionAnalyticsInputType
   ) {
@@ -370,6 +368,7 @@ class SubmissionService {
         formId: payload.formId,
         submissionCount: 0,
         fieldAnalytics: [],
+        timeline: [],
       };
     }
 
@@ -383,6 +382,29 @@ class SubmissionService {
 
     const submissionCount = countResult[0]?.count ?? 0;
 
+    // Get submission times grouped by submitter to calculate a daily timeline
+    const submissionTimes = await db
+      .select({
+        submitterId: answerTable.submitterId,
+        submittedAt: sql<string>`min(${answerTable.createdAt})`,
+      })
+      .from(answerTable)
+      .where(inArray(answerTable.formFieldId, fieldIds))
+      .groupBy(answerTable.submitterId);
+
+    const dateCounts: Record<string, number> = {};
+    for (const sub of submissionTimes) {
+      if (sub.submittedAt) {
+        const d = new Date(sub.submittedAt);
+        const yyyymmdd = d.toISOString().split("T")[0]!;
+        dateCounts[yyyymmdd] = (dateCounts[yyyymmdd] ?? 0) + 1;
+      }
+    }
+
+    const timeline = Object.entries(dateCounts)
+      .map(([date, count]) => ({ date, count }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
     // Per-field analytics
     const fieldAnalytics = [];
     for (const field of fields) {
@@ -393,8 +415,26 @@ class SubmissionService {
 
       const answerCount = answers.length;
       const valueCounts: Record<string, number> = {};
+      let stats: { min?: number; max?: number; average?: number } | undefined = undefined;
+
+      if (field.type === "number" && answerCount > 0) {
+        const nums = answers
+          .map((a) => Number(a.answer))
+          .filter((n) => !isNaN(n));
+        if (nums.length > 0) {
+          const min = Math.min(...nums);
+          const max = Math.max(...nums);
+          const average = nums.reduce((sum, n) => sum + n, 0) / nums.length;
+          stats = {
+            min,
+            max,
+            average: parseFloat(average.toFixed(2)),
+          };
+        }
+      }
+
       for (const a of answers) {
-        if (field.type === 'multi_select') {
+        if (field.type === "multi_select") {
           try {
             const parsed = JSON.parse(a.answer);
             if (Array.isArray(parsed)) {
@@ -418,6 +458,7 @@ class SubmissionService {
         type: field.type,
         answerCount,
         valueCounts,
+        stats,
       });
     }
 
@@ -425,8 +466,8 @@ class SubmissionService {
       formId: payload.formId,
       submissionCount,
       fieldAnalytics,
+      timeline,
     };
   }
 }
-
 export default SubmissionService;

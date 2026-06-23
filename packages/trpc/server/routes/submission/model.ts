@@ -103,6 +103,19 @@ export const getBasicSubmissionAnalyticsOutputModel = z.object({
       type: z.string(),
       answerCount: z.number(),
       valueCounts: z.record(z.string(), z.number()),
+      stats: z
+        .object({
+          min: z.number().optional(),
+          max: z.number().optional(),
+          average: z.number().optional(),
+        })
+        .optional(),
+    })
+  ),
+  timeline: z.array(
+    z.object({
+      date: z.string(),
+      count: z.number(),
     })
   ),
 });

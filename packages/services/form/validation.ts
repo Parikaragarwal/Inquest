@@ -12,6 +12,7 @@ export const FORM_FIELD_TYPES = [
   "date",
   "single_select",
   "multi_select",
+  "rating",
 ] as const;
 
 export type FormFieldType = (typeof FORM_FIELD_TYPES)[number];
@@ -143,6 +144,17 @@ export const multiSelectConfigSchema = z
     { message: "maxSelections must be <= number of options" }
   );
 
+export const ratingConfigSchema = z
+  .object({
+    min: z.number().int().min(1).default(1),
+    max: z.number().int().min(1).max(10).default(5),
+  })
+  .strict()
+  .refine(
+    (data) => data.min <= data.max,
+    { message: "min must be <= max" }
+  );
+
 // ─── Config Schema Map ──────────────────────────────────
 
 const configSchemaMap: Record<FormFieldType, z.ZodTypeAny> = {
@@ -155,6 +167,7 @@ const configSchemaMap: Record<FormFieldType, z.ZodTypeAny> = {
   date: dateConfigSchema,
   single_select: singleSelectConfigSchema,
   multi_select: multiSelectConfigSchema,
+  rating: ratingConfigSchema,
 };
 
 // ─── Validate Field Configuration ────────────────────────
@@ -172,30 +185,18 @@ interface FieldForConfigValidation {
 export function validateFieldConfiguration(
   field: FieldForConfigValidation
 ): Record<string, unknown> | null {
-  if (
-    field.validation === null ||
-    field.validation === undefined
-  ) {
-    // Select/multi_select fields always require config with options
-    if (field.type === "single_select" || field.type === "multi_select") {
-      throw new Error(
-        `Field type '${field.type}' requires a validation config with options`
-      );
-    }
-    return null;
-  }
+  let config = field.validation as Record<string, any> | null | undefined;
 
-  // If it's an empty object, treat as null (except for select types)
-  if (
-    typeof field.validation === "object" &&
-    !Array.isArray(field.validation) &&
-    Object.keys(field.validation as object).length === 0
-  ) {
+  // Set sensible defaults if no configuration object is provided (or is empty)
+  if (config === null || config === undefined || (typeof config === "object" && !Array.isArray(config) && Object.keys(config).length === 0)) {
     if (field.type === "single_select" || field.type === "multi_select") {
       throw new Error(
         `Field type '${field.type}' requires a validation config with options`
       );
     }
+    if (field.type === "text") return { maxLength: 1000 };
+    if (field.type === "textarea") return { maxLength: 10000 };
+    if (field.type === "rating") return { min: 1, max: 5 };
     return null;
   }
 
@@ -204,14 +205,28 @@ export function validateFieldConfiguration(
     throw new Error(`Unknown field type: ${field.type}`);
   }
 
-  const result = schema.safeParse(field.validation);
+  const result = schema.safeParse(config);
   if (!result.success) {
     throw new Error(
       `Invalid validation config for field type '${field.type}': ${result.error.message}`
     );
   }
 
-  return result.data as Record<string, unknown>;
+  const validatedData = result.data as Record<string, any>;
+  
+  // Merge defaults if not supplied
+  if (field.type === "text" && validatedData.maxLength === undefined) {
+    validatedData.maxLength = 1000;
+  }
+  if (field.type === "textarea" && validatedData.maxLength === undefined) {
+    validatedData.maxLength = 10000;
+  }
+  if (field.type === "rating") {
+    if (validatedData.min === undefined) validatedData.min = 1;
+    if (validatedData.max === undefined) validatedData.max = 5;
+  }
+
+  return validatedData;
 }
 
 // ─── Validate Answer ─────────────────────────────────────
@@ -402,6 +417,19 @@ export function validateAnswer(
         throw new Error(
           `Field '${field.label}' allows at most ${maxSelections} selections`
         );
+      }
+      break;
+    }
+
+    case "rating": {
+      const num = Number(answer);
+      if (isNaN(num) || !Number.isInteger(num)) {
+        throw new Error(`Field '${field.label}' must be a valid integer rating`);
+      }
+      const min = (config?.min as number) ?? 1;
+      const max = (config?.max as number) ?? 5;
+      if (num < min || num > max) {
+        throw new Error(`Field '${field.label}' rating must be between ${min} and ${max}`);
       }
       break;
     }

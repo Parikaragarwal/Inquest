@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import { trpc } from '~/trpc/client';
 import { motion } from 'framer-motion';
 import { useGetuser } from '~/hooks/api/auth';
 import { toast } from 'sonner';
-import { Lock, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Lock, CheckCircle2, AlertCircle, Star } from 'lucide-react';
 import Link from 'next/link';
 
 // Common dial codes for phone fields
@@ -33,7 +33,7 @@ const COUNTRY_CODES = [
   { label: '+52 (MX)', value: '+52' },
 ];
 
-export default function PublicFormSubmissionPage() {
+function FormSubmissionComponent() {
   const params = useParams();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -47,6 +47,7 @@ export default function PublicFormSubmissionPage() {
   // separate state for multi_select (arrays) and phone (country code)
   const [multiSelectAnswers, setMultiSelectAnswers] = useState<Record<string, string[]>>({});
   const [phoneCountryCodes, setPhoneCountryCodes] = useState<Record<string, string>>({});
+  const [hoveredRating, setHoveredRating] = useState<Record<string, number>>({});
   const [codeInputValue, setCodeInputValue] = useState('');
   const [honeypot, setHoneypot] = useState('');
   const [isBotSuccess, setIsBotSuccess] = useState(false);
@@ -71,6 +72,28 @@ export default function PublicFormSubmissionPage() {
       toast.error(err.message || 'Failed to submit response');
     }
   });
+
+  const themeObj = (form?.theme as Record<string, any>) || {};
+  const hasCustomBg = !!(themeObj.backgroundColor || themeObj.backgroundImageUrl);
+  const containerStyle: React.CSSProperties = {};
+
+  if (themeObj.backgroundColor) {
+    containerStyle.backgroundColor = themeObj.backgroundColor;
+  }
+  if (themeObj.backgroundImageUrl) {
+    containerStyle.backgroundImage = `url(${themeObj.backgroundImageUrl})`;
+    containerStyle.backgroundSize = 'cover';
+    containerStyle.backgroundPosition = 'center';
+    containerStyle.backgroundAttachment = 'fixed';
+  }
+
+  useEffect(() => {
+    if (themeObj.mode === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else if (themeObj.mode === 'light') {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [themeObj.mode]);
 
   // Pre-fill answers for logged-in users
   useEffect(() => {
@@ -287,6 +310,15 @@ export default function PublicFormSubmissionPage() {
             return;
           }
         }
+        if (field.type === 'rating') {
+          const num = Number(answer);
+          const minVal = field.validation.min ?? 1;
+          const maxVal = field.validation.max ?? 5;
+          if (isNaN(num) || num < minVal || num > maxVal) {
+            toast.error(`${field.label}: Rating must be between ${minVal} and ${maxVal}`);
+            return;
+          }
+        }
         if (field.type === 'date') {
           const d = new Date(answer);
           if (field.validation.minDate && d < new Date(field.validation.minDate)) {
@@ -320,7 +352,7 @@ export default function PublicFormSubmissionPage() {
   };
 
   return (
-    <div className="min-h-screen bg-inquest-base py-12 px-4 sm:px-6">
+    <div style={containerStyle} className={`min-h-screen py-12 px-4 sm:px-6 transition-all duration-300 ${!hasCustomBg ? 'bg-inquest-base' : ''}`}>
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-2xl mx-auto">
         <header className="mb-12 text-center">
           <h1 className="text-4xl font-serif text-inquest-ink mb-4 tracking-tight">{form?.title}</h1>
@@ -468,6 +500,47 @@ export default function PublicFormSubmissionPage() {
                 </div>
               )}
 
+              {/* RATING */}
+              {field.type === 'rating' && (
+                <div>
+                  <div className="flex items-center gap-1.5 mt-2">
+                    {Array.from({ length: field.validation?.max ?? 5 }).map((_, i) => {
+                      const starValue = i + 1;
+                      const currentAnswer = Number(answers[field.id] || '0');
+                      const isActive = starValue <= (hoveredRating[field.id] ?? currentAnswer);
+                      return (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => setAnswer(field.id, starValue.toString())}
+                          onMouseEnter={() => setHoveredRating((prev) => ({ ...prev, [field.id]: starValue }))}
+                          onMouseLeave={() => setHoveredRating((prev) => {
+                            const copy = { ...prev };
+                            delete copy[field.id];
+                            return copy;
+                          })}
+                          className="p-1 hover:scale-110 transition-transform cursor-pointer focus:outline-none"
+                        >
+                          <Star
+                            size={36}
+                            className={`transition-all duration-150 ${
+                              isActive
+                                ? 'fill-amber-400 text-amber-500 drop-shadow-[0_0_8px_rgba(245,158,11,0.5)] scale-105'
+                                : 'text-inquest-ink-ghost hover:text-inquest-ink-soft'
+                            }`}
+                          />
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <input
+                    type="hidden"
+                    required={field.required}
+                    value={answers[field.id] || ''}
+                  />
+                </div>
+              )}
+
               {/* SINGLE SELECT */}
               {field.type === 'single_select' && (
                 <div className="space-y-3">
@@ -555,6 +628,18 @@ export default function PublicFormSubmissionPage() {
         </form>
       </motion.div>
     </div>
+  );
+}
+
+export default function PublicFormSubmissionPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-inquest-base flex items-center justify-center">
+        <div className="w-8 h-8 rounded-full border-2 border-inquest-accent border-t-transparent animate-spin" />
+      </div>
+    }>
+      <FormSubmissionComponent />
+    </Suspense>
   );
 }
 

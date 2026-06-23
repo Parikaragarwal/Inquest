@@ -83,6 +83,7 @@ class FormService {
           secureCode: input.secureCode || null,
           isOpenForSubmission: input.isOpenForSubmission,
           requiresAuth: input.requiresAuth,
+          theme: input.theme,
           createdBy: input.userId,
         })
         .returning({ id: formsTable.id });
@@ -155,6 +156,8 @@ class FormService {
         updateData.isOpenForSubmission = input.isOpenForSubmission;
       if (input.requiresAuth !== undefined)
         updateData.requiresAuth = input.requiresAuth;
+      if (input.theme !== undefined)
+        updateData.theme = input.theme;
 
       console.log("[updateForm] Input secureCode:", input.secureCode);
       console.log("[updateForm] Updating data:", updateData);
@@ -319,7 +322,7 @@ class FormService {
 
     // Secure code check
     if (form.secureCode) {
-      if (!payload.secureCode || payload.secureCode !== form.secureCode) {
+      if (!payload.secureCode || payload.secureCode.trim().toUpperCase() !== form.secureCode.trim().toUpperCase()) {
         throw new Error("Invalid or missing secure code");
       }
     }
@@ -336,6 +339,7 @@ class FormService {
       description: form.description,
       isOpenForSubmission: form.isOpenForSubmission,
       requiresAuth: form.requiresAuth,
+      theme: form.theme,
       fields,
     };
   }

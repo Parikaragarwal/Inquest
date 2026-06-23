@@ -6,6 +6,7 @@ import {
   boolean,
   timestamp,
   index,
+  jsonb,
 } from "drizzle-orm/pg-core";
 import { usersTable } from "./user";
 
@@ -31,6 +32,13 @@ export const formsTable = pgTable(
     requiresAuth: boolean("requires_auth")
       .notNull()
       .default(true),
+
+    theme: jsonb("theme").$type<{
+      backgroundColor?: string;
+      backgroundImageUrl?: string;
+      mode?: "light" | "dark";
+      accentColor?: string;
+    }>(),
 
     createdAt: timestamp("created_at").defaultNow(),
     updatedAt: timestamp("updated_at").$onUpdate(() => new Date()),

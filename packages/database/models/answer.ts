@@ -4,6 +4,7 @@ import {
   text,
   index,
   unique,
+  timestamp,
 } from "drizzle-orm/pg-core";
 import { formFieldTable } from "./form-field";
 import { usersTable } from "./user";
@@ -20,6 +21,8 @@ export const answerTable = pgTable(
     answer: text("answer").notNull(),
 
     submitterId: uuid("submitter_id").notNull(),
+
+    createdAt: timestamp("created_at").defaultNow(),
   },
   (table) => [
     index("answer_form_field_id_index").on(table.formFieldId),

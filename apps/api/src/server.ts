@@ -13,7 +13,7 @@ import { env } from "./env";
 
 export const app = express();
 const openApiDocument = generateOpenApiDocument(serverRouter, {
-  title: "Streamyst OpenAPI",
+  title: "Inquest OpenAPI",
   version: "1.0.0",
   baseUrl: env.BASE_URL.concat("/api"),
 });
@@ -21,7 +21,7 @@ const openApiDocument = generateOpenApiDocument(serverRouter, {
 
   app.use(
     cors({
-      origin: "http://localhost:3000",
+      origin: env.CLIENT_URL,
       credentials:true
     }),
   );
@@ -75,10 +75,10 @@ app.get("/auth/google/callback", async (req, res) => {
       maxAge: YEAR
     });
 
-    res.redirect("http://localhost:3000/dashboard");
+    res.redirect(`${env.CLIENT_URL}/dashboard`);
   } catch (error: any) {
     logger.error("Google Callback Error: " + error.message);
-    res.redirect("http://localhost:3000/login?error=google_auth_failed");
+    res.redirect(`${env.CLIENT_URL}/login?error=google_auth_failed`);
   }
 });
 

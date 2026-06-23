@@ -1,0 +1,1 @@
+ALTER TYPE "public"."form_field_type" ADD VALUE 'rating';
