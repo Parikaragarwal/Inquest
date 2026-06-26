@@ -109,7 +109,7 @@ export function FormPreview({
     const config = mode === 'dark' ? theme.darkMode : theme.lightMode;
     resolvedBgColor = config?.backgroundColor || (mode === 'dark' ? '#0B0705' : '#F5EFEB');
     resolvedAccent = config?.accentColor || (mode === 'dark' ? '#E06F28' : '#D97436');
-    resolvedFieldColor = theme.fieldColor || '';
+    resolvedFieldColor = config?.fieldColor || theme.fieldColor || '';
     const bgId = config?.backgroundId;
     if (bgId && bgId !== 'none') {
       const found = backgroundsData.backgrounds.find((bg) => bg.id === bgId);
@@ -127,33 +127,127 @@ export function FormPreview({
     }
   }
 
-  // Compute readable text color based on field background luminance
-  const fieldTextColor = resolvedFieldColor ? (() => {
+  // Strict visual constraints based on preview theme mode
+  if (mode === 'dark') {
+    // 1. Force the base background color to be dark
+    if (resolvedBgColor) {
+      const hex = resolvedBgColor.replace('#', '');
+      const r = parseInt(hex.substring(0, 2), 16);
+      const g = parseInt(hex.substring(2, 4), 16);
+      const b = parseInt(hex.substring(4, 6), 16);
+      const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+      if (luminance > 0.45) {
+        resolvedBgColor = '#0B0705';
+      }
+    } else {
+      resolvedBgColor = '#0B0705';
+    }
+
+    // 2. Force the field background color to be dark
+    if (resolvedFieldColor) {
+      const hex = resolvedFieldColor.replace('#', '');
+      const r = parseInt(hex.substring(0, 2), 16);
+      const g = parseInt(hex.substring(2, 4), 16);
+      const b = parseInt(hex.substring(4, 6), 16);
+      const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+      if (luminance > 0.45) {
+        resolvedFieldColor = '#0F0A08';
+      }
+    } else {
+      resolvedFieldColor = '#0F0A08';
+    }
+  } else {
+    // Light mode:
+    // 1. Force base background color to be light
+    if (resolvedBgColor) {
+      const hex = resolvedBgColor.replace('#', '');
+      const r = parseInt(hex.substring(0, 2), 16);
+      const g = parseInt(hex.substring(2, 4), 16);
+      const b = parseInt(hex.substring(4, 6), 16);
+      const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+      if (luminance <= 0.45) {
+        resolvedBgColor = '#F5EFEB';
+      }
+    } else {
+      resolvedBgColor = '#F5EFEB';
+    }
+
+    // 2. Force field background color to be light
+    if (resolvedFieldColor) {
+      const hex = resolvedFieldColor.replace('#', '');
+      const r = parseInt(hex.substring(0, 2), 16);
+      const g = parseInt(hex.substring(2, 4), 16);
+      const b = parseInt(hex.substring(4, 6), 16);
+      const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+      if (luminance <= 0.45) {
+        resolvedFieldColor = '#FAF5F2';
+      }
+    } else {
+      resolvedFieldColor = '#FAF5F2';
+    }
+  }
+
+  // Compute text color (Strict light color in dark mode, dark color in light mode)
+  const fieldTextColor = mode === 'dark' ? '#F2EBE5' : (resolvedFieldColor ? (() => {
     try {
       const hex = resolvedFieldColor.replace('#', '');
       const r = parseInt(hex.substring(0, 2), 16);
       const g = parseInt(hex.substring(2, 4), 16);
       const b = parseInt(hex.substring(4, 6), 16);
       const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-      return luminance > 0.5 ? '#1a1a1a' : '#f5f5f5';
-    } catch { return undefined; }
-  })() : undefined;
+      return luminance > 0.5 ? '#3A2312' : '#F2EBE5';
+    } catch { return '#3A2312'; }
+  })() : '#3A2312');
+
+  // Inject local style variables overrides to block global site dark/light mode classes
+  const localThemeOverrides: React.CSSProperties = mode === 'dark' ? {
+    '--color-inquest-base': resolvedBgColor,
+    '--color-inquest-surface': resolvedFieldColor,
+    '--color-inquest-depth': '#150F0C',
+    '--color-inquest-rule': '#2D1D16',
+    '--color-inquest-ink': '#F2EBE5',
+    '--color-inquest-ink-mid': '#D9CFC6',
+    '--color-inquest-ink-soft': '#A39387',
+    '--color-inquest-ink-ghost': '#5C4D44',
+    '--color-inquest-accent': resolvedAccent,
+    '--color-inquest-accent-soft': '#F98740',
+    '--color-inquest-accent-pale': '#1E120A',
+    '--color-inquest-sage': '#F2B024',
+    '--color-inquest-caution': '#EF5350',
+    colorScheme: 'dark',
+  } as React.CSSProperties : {
+    '--color-inquest-base': resolvedBgColor,
+    '--color-inquest-surface': resolvedFieldColor,
+    '--color-inquest-depth': '#ECE2DB',
+    '--color-inquest-rule': '#DFD0C4',
+    '--color-inquest-ink': '#3A2312',
+    '--color-inquest-ink-mid': '#5B402B',
+    '--color-inquest-ink-soft': '#856953',
+    '--color-inquest-ink-ghost': '#BCAE9F',
+    '--color-inquest-accent': resolvedAccent,
+    '--color-inquest-accent-soft': '#DC6B27',
+    '--color-inquest-accent-pale': '#FDF4ED',
+    '--color-inquest-sage': '#D29416',
+    '--color-inquest-caution': '#C62828',
+    colorScheme: 'light',
+  } as React.CSSProperties;
 
   const containerStyle: React.CSSProperties = {
-    backgroundColor: resolvedBg ? resolvedBgColor : 'transparent',
+    backgroundColor: resolvedBgColor,
     ...(resolvedBg ? {
       backgroundImage: `url(${resolvedBg})`,
       backgroundSize: 'cover',
       backgroundPosition: 'center',
       backgroundAttachment: 'fixed',
     } : {}),
+    ...localThemeOverrides,
   };
 
-  const fieldCardStyle: React.CSSProperties = resolvedFieldColor ? {
+  const fieldCardStyle: React.CSSProperties = {
     backgroundColor: resolvedFieldColor,
     color: fieldTextColor,
-    borderColor: fieldTextColor === '#f5f5f5' ? 'rgba(255,255,255,0.15)' : undefined,
-  } : {};
+    borderColor: fieldTextColor === '#F2EBE5' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)',
+  };
 
   const getVal = (fid: string) => (interactive ? answers[fid] : localAnswers[fid]) || '';
   

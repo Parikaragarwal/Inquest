@@ -545,10 +545,9 @@ const FieldCard = memo(function FieldCard({
       layout="position"
       layoutId={field.localId}
       whileDrag={{
-        scale: 1.025,
-        rotate: 1.2,
-        boxShadow: '0 28px 54px -8px rgba(200, 90, 23, 0.38)',
-        opacity: 0.96,
+        scale: 1.01,
+        boxShadow: '0 16px 32px -6px rgba(0, 0, 0, 0.15)',
+        opacity: 0.98,
         zIndex: 50,
       }}
       transition={{ layout: { duration: 0.22, ease: 'easeInOut' } }}
@@ -702,25 +701,27 @@ const AddFieldStrip = memo(function AddFieldStrip({
   onToggle: () => void;
 }) {
   return (
-    <div className="relative">
-      {/* The strip line */}
+    <div className="relative pt-2">
+      {/* The main action button card */}
       <button
         onClick={onToggle}
         aria-expanded={isOpen}
         aria-label="Add a new question"
         className={cn(
-          'w-full flex items-center justify-center gap-3 py-3.5 rounded-2xl border-2 border-dashed transition-all cursor-pointer group',
+          'w-full flex items-center justify-center gap-3 py-4 rounded-[1.75rem] border-2 transition-all cursor-pointer shadow-sm group duration-200',
           isOpen
-            ? 'border-inquest-accent bg-inquest-accent/5 text-inquest-accent'
-            : 'border-inquest-rule/50 text-inquest-ink-ghost hover:border-inquest-accent/50 hover:text-inquest-ink-soft'
+            ? 'border-inquest-accent bg-inquest-accent text-white hover:bg-inquest-accent-soft shadow-md'
+            : 'border-inquest-accent/40 bg-inquest-surface text-inquest-accent hover:border-inquest-accent hover:bg-inquest-accent-pale/35 hover:shadow-md'
         )}
       >
-        <div className={cn('transition-transform duration-200', isOpen ? 'rotate-45' : '')}>
-          <Plus size={16} />
+        <div className={cn('transition-transform duration-300', isOpen ? 'rotate-[135deg]' : 'group-hover:rotate-90')}>
+          <Plus size={18} strokeWidth={2.5} />
         </div>
-        <span className="text-xs font-bold uppercase tracking-widest">Add a Question</span>
-        <div className={cn('transition-transform duration-200', isOpen ? 'rotate-45' : '')}>
-          <Plus size={16} />
+        <span className="text-xs font-black uppercase tracking-widest">
+          {isOpen ? 'Close Question Panel' : 'Add a New Question Field'}
+        </span>
+        <div className={cn('transition-transform duration-300', isOpen ? 'rotate-[135deg]' : 'group-hover:rotate-90')}>
+          <Plus size={18} strokeWidth={2.5} />
         </div>
       </button>
 
@@ -728,29 +729,29 @@ const AddFieldStrip = memo(function AddFieldStrip({
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            initial={{ opacity: 0, y: -8, scale: 0.97 }}
+            initial={{ opacity: 0, y: -12, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -8, scale: 0.97 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 28 }}
-            className="mt-2 bg-inquest-surface border border-inquest-rule rounded-[1.5rem] p-5 shadow-xl"
+            exit={{ opacity: 0, y: -12, scale: 0.97 }}
+            transition={{ type: 'spring', stiffness: 320, damping: 26 }}
+            className="mt-3 bg-inquest-surface border border-inquest-rule rounded-[2rem] p-5 sm:p-6 shadow-xl relative z-10 warm-shadow"
           >
-            <p className="text-[10px] font-bold text-inquest-ink-soft uppercase tracking-wider mb-3">
-              Choose a field type
+            <p className="text-[10px] font-extrabold text-inquest-ink-soft uppercase tracking-wider mb-4 text-center sm:text-left">
+              Select Field Type to Insert
             </p>
-            <div className="grid grid-cols-5 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
               {FIELD_TYPES.map(({ type, label, icon: Icon }) => (
                 <motion.button
                   key={type}
-                  whileHover={{ scale: 1.06, y: -2 }}
+                  whileHover={{ scale: 1.04, y: -2 }}
                   whileTap={{ scale: 0.96 }}
                   onClick={() => {
                     onAdd(type);
                     onToggle();
                   }}
-                  className="flex flex-col items-center justify-center gap-1.5 p-3 bg-inquest-base/50 border border-inquest-rule/50 rounded-xl hover:border-inquest-accent hover:bg-inquest-accent/5 transition-colors cursor-pointer"
+                  className="flex flex-col items-center justify-center gap-2.5 p-4 bg-inquest-base border border-inquest-rule rounded-2xl hover:border-inquest-accent hover:bg-inquest-accent/5 hover:text-inquest-accent transition-all cursor-pointer shadow-xs hover:shadow-sm group/btn"
                 >
-                  <Icon size={18} className="text-inquest-ink-soft" />
-                  <span className="text-[9px] font-bold text-inquest-ink text-center leading-tight">{label}</span>
+                  <Icon size={20} className="text-inquest-accent group-hover/btn:scale-110 transition-transform" />
+                  <span className="text-[10px] font-extrabold text-inquest-ink text-center leading-tight">{label}</span>
                 </motion.button>
               ))}
             </div>
@@ -794,11 +795,20 @@ const ThemeControlPanel = memo(function ThemeControlPanel({
   const currentBgId      = currentModeConfig?.backgroundId || 'none';
   const currentAccent    = currentModeConfig?.accentColor   || (previewMode === 'dark' ? '#E06F28' : '#D97436');
   const currentBgColor   = currentModeConfig?.backgroundColor || (previewMode === 'dark' ? '#0B0705' : '#F5EFEB');
-  const currentFieldColor = theme.fieldColor || '';
+  const currentFieldColor = currentModeConfig?.fieldColor || theme.fieldColor || '';
 
   const updateModeTheme = (patch: Partial<{ backgroundColor: string; accentColor: string; backgroundId: string }>) => {
     const key = previewMode === 'dark' ? 'darkMode' : 'lightMode';
     setTheme((prev) => ({ ...prev, [key]: { ...prev[key], ...patch } }));
+  };
+
+  const updateFieldColor = (color: string) => {
+    const key = previewMode === 'dark' ? 'darkMode' : 'lightMode';
+    setTheme((prev) => ({
+      ...prev,
+      fieldColor: color,
+      [key]: { ...prev[key], fieldColor: color }
+    }));
   };
 
   // Filter backgrounds by mode
@@ -822,14 +832,62 @@ const ThemeControlPanel = memo(function ThemeControlPanel({
         <div className="flex items-center gap-1 bg-inquest-base border border-inquest-rule rounded-lg p-0.5">
           <button
             type="button"
-            onClick={() => { setPreviewMode('light'); setTheme((p) => ({ ...p, mode: 'light' })); }}
+            onClick={() => {
+              setPreviewMode('light');
+              setTheme((prev) => {
+                const targetColor = prev.lightMode?.fieldColor || prev.fieldColor || '';
+                let nextColor = targetColor;
+                if (targetColor) {
+                  const hex = targetColor.replace('#', '');
+                  const r = parseInt(hex.substring(0, 2), 16);
+                  const g = parseInt(hex.substring(2, 4), 16);
+                  const b = parseInt(hex.substring(4, 6), 16);
+                  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+                  if (luminance <= 0.45) {
+                    nextColor = '#FAF5F2'; // default light field bg
+                  }
+                } else {
+                  nextColor = '#FAF5F2';
+                }
+                return {
+                  ...prev,
+                  mode: 'light',
+                  fieldColor: nextColor,
+                  lightMode: { ...prev.lightMode, fieldColor: nextColor }
+                };
+              });
+            }}
             className={cn('flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer', previewMode === 'light' ? 'bg-inquest-surface text-inquest-accent shadow-sm' : 'text-inquest-ink-soft hover:text-inquest-ink')}
           >
             <Sun size={11} /> Light
           </button>
           <button
             type="button"
-            onClick={() => { setPreviewMode('dark'); setTheme((p) => ({ ...p, mode: 'dark' })); }}
+            onClick={() => {
+              setPreviewMode('dark');
+              setTheme((prev) => {
+                const targetColor = prev.darkMode?.fieldColor || prev.fieldColor || '';
+                let nextColor = targetColor;
+                if (targetColor) {
+                  const hex = targetColor.replace('#', '');
+                  const r = parseInt(hex.substring(0, 2), 16);
+                  const g = parseInt(hex.substring(2, 4), 16);
+                  const b = parseInt(hex.substring(4, 6), 16);
+                  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+                  if (luminance > 0.45) {
+                    nextColor = '#0F0A08'; // default dark field bg
+                  }
+                } else {
+                  nextColor = '#0F0A08';
+                }
+                return {
+                  ...prev,
+                  mode: 'dark',
+                  fieldColor: nextColor,
+                  darkMode: { ...prev.darkMode, fieldColor: nextColor }
+                };
+              });
+            }}
             className={cn('flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer', previewMode === 'dark' ? 'bg-inquest-surface text-inquest-accent shadow-sm' : 'text-inquest-ink-soft hover:text-inquest-ink')}
           >
             <Moon size={11} /> Dark
@@ -1006,7 +1064,7 @@ const ThemeControlPanel = memo(function ThemeControlPanel({
                       <button
                         key={preset.label}
                         type="button"
-                        onClick={() => setTheme((prev) => ({ ...prev, fieldColor: preset.value }))}
+                        onClick={() => updateFieldColor(preset.value)}
                         title={preset.label}
                         className={cn(
                           'w-9 h-9 rounded-xl border-2 transition-all cursor-pointer flex items-center justify-center',
@@ -1035,15 +1093,15 @@ const ThemeControlPanel = memo(function ThemeControlPanel({
                       const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
                       if (previewMode === 'light' && luminance < 0.5) {
                         toast.warning("Fields must be light in Light Mode. Auto-adjusting.");
-                        setTheme((prev) => ({ ...prev, fieldColor: '#FFFFFF' }));
+                        updateFieldColor('#FFFFFF');
                         return;
                       }
-                      if (previewMode === 'dark' && luminance > 0.4) {
+                      if (previewMode === 'dark' && luminance > 0.45) {
                         toast.warning("Fields must be dark in Dark Mode. Auto-adjusting.");
-                        setTheme((prev) => ({ ...prev, fieldColor: '#1F2937' }));
+                        updateFieldColor('#1E1511');
                         return;
                       }
-                      setTheme((prev) => ({ ...prev, fieldColor: color }));
+                      updateFieldColor(color);
                     }}
                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                     title="Custom field color"
