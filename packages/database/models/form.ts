@@ -38,6 +38,9 @@ export const formsTable = pgTable(
       backgroundImageUrl?: string;
       mode?: "light" | "dark";
       accentColor?: string;
+      lightMode?: { backgroundColor?: string; accentColor?: string; backgroundId?: string };
+      darkMode?: { backgroundColor?: string; accentColor?: string; backgroundId?: string };
+      fieldColor?: string;
     }>(),
 
     createdAt: timestamp("created_at").defaultNow(),

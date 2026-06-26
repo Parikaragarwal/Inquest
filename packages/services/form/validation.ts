@@ -405,6 +405,9 @@ export function validateAnswer(
           `Field '${field.label}' must be a JSON-stringified array of strings`
         );
       }
+      if (field.required && selected.length === 0) {
+        throw new Error(`Field '${field.label}' is required`);
+      }
       for (const val of selected) {
         if (!options.includes(val)) {
           throw new Error(

@@ -1,38 +1,39 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, memo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { trpc } from '~/trpc/client';
-import { motion, AnimatePresence, Reorder } from 'framer-motion';
+import { motion, AnimatePresence, Reorder, useDragControls, LayoutGroup } from 'framer-motion';
 import { toast } from 'sonner';
 import { QRCodeSVG } from 'qrcode.react';
 import {
   Save, Globe, Lock, ArrowLeft, Trash2,
   Settings, Type, FileText, Hash, CheckSquare,
   Calendar, List, CheckCircle, Mail, Phone,
-  ArrowUp, ArrowDown, Copy, ExternalLink, Users, ClipboardCopy, AlertCircle, Edit3, GripVertical, Eye, EyeOff,
-  Star, Sun, Moon, Sparkles, Check, Palette, HelpCircle
+  Copy, ExternalLink, Users, ClipboardCopy, Edit3, GripVertical, Eye,
+  Star, Sun, Moon, Sparkles, Check, Palette, Plus, X, ChevronDown, ChevronUp,
+  AlertCircle, RotateCcw, QrCode, Link, ChevronLeft, ChevronRight, Asterisk,
+  Download
 } from 'lucide-react';
 import { useGetuser } from '~/hooks/api/auth';
-import Link from 'next/link';
+import NextLink from 'next/link';
+import { Switch } from '~/components/ui/switch';
+import { FormPreview } from '~/components/form-preview';
+import backgroundsData from '~/public/backgrounds.json';
+import { cn } from '~/lib/utils';
 
 // ─── Types ──────────────────────────────────────────────────
 
 type FieldValidation = {
-  // text / textarea
   minLength?: number;
   maxLength?: number;
   pattern?: string;
-  // number
   min?: number;
   max?: number;
-  // date
   minDate?: string;
   maxDate?: string;
-  // single_select / multi_select
   options?: string[];
   maxSelections?: number;
-  // phone
   countryCode?: string;
 };
 
@@ -60,55 +61,1017 @@ type DraftState = {
 // ─── Constants ────────────────────────────────────────────────
 
 const FIELD_TYPES = [
-  { type: 'text', label: 'Short Answer', icon: Type },
-  { type: 'textarea', label: 'Long Answer', icon: FileText },
-  { type: 'number', label: 'Number', icon: Hash },
-  { type: 'boolean', label: 'Yes/No', icon: CheckSquare },
-  { type: 'date', label: 'Date', icon: Calendar },
-  { type: 'single_select', label: 'Single Choice', icon: CheckCircle },
-  { type: 'multi_select', label: 'Multiple Choice', icon: List },
-  { type: 'email', label: 'Email', icon: Mail },
-  { type: 'phone', label: 'Phone', icon: Phone },
-  { type: 'rating', label: 'Rating Stars', icon: Star },
+  { type: 'text',          label: 'Short Answer',    icon: Type },
+  { type: 'textarea',      label: 'Long Answer',     icon: FileText },
+  { type: 'number',        label: 'Number',          icon: Hash },
+  { type: 'boolean',       label: 'Yes / No',        icon: CheckSquare },
+  { type: 'date',          label: 'Date',            icon: Calendar },
+  { type: 'single_select', label: 'Single Choice',   icon: CheckCircle },
+  { type: 'multi_select',  label: 'Multiple Choice', icon: List },
+  { type: 'email',         label: 'Email',           icon: Mail },
+  { type: 'phone',         label: 'Phone',           icon: Phone },
+  { type: 'rating',        label: 'Rating Stars',    icon: Star },
 ];
 
-// Common country dial codes
 const COUNTRY_CODES = [
-  { label: 'None', value: '' },
-  { label: '+1 (US/CA)', value: '+1' },
-  { label: '+44 (UK)', value: '+44' },
-  { label: '+91 (India)', value: '+91' },
-  { label: '+61 (Australia)', value: '+61' },
-  { label: '+49 (Germany)', value: '+49' },
-  { label: '+33 (France)', value: '+33' },
-  { label: '+81 (Japan)', value: '+81' },
-  { label: '+86 (China)', value: '+86' },
-  { label: '+55 (Brazil)', value: '+55' },
-  { label: '+7 (Russia)', value: '+7' },
-  { label: '+34 (Spain)', value: '+34' },
-  { label: '+39 (Italy)', value: '+39' },
-  { label: '+82 (Korea)', value: '+82' },
-  { label: '+65 (Singapore)', value: '+65' },
-  { label: '+971 (UAE)', value: '+971' },
-  { label: '+966 (Saudi)', value: '+966' },
-  { label: '+20 (Egypt)', value: '+20' },
-  { label: '+27 (S. Africa)', value: '+27' },
-  { label: '+52 (Mexico)', value: '+52' },
+  { label: 'None',         value: '' },
+  { label: '+1 (US/CA)',   value: '+1' },
+  { label: '+44 (UK)',     value: '+44' },
+  { label: '+91 (India)',  value: '+91' },
+  { label: '+61 (AU)',     value: '+61' },
+  { label: '+49 (DE)',     value: '+49' },
+  { label: '+33 (FR)',     value: '+33' },
+  { label: '+81 (JP)',     value: '+81' },
+  { label: '+86 (CN)',     value: '+86' },
+  { label: '+55 (BR)',     value: '+55' },
+  { label: '+7 (RU)',      value: '+7' },
+  { label: '+34 (ES)',     value: '+34' },
+  { label: '+39 (IT)',     value: '+39' },
+  { label: '+82 (KR)',     value: '+82' },
+  { label: '+65 (SG)',     value: '+65' },
+  { label: '+971 (UAE)',   value: '+971' },
+  { label: '+966 (SA)',    value: '+966' },
+  { label: '+20 (EG)',     value: '+20' },
+  { label: '+27 (ZA)',     value: '+27' },
+  { label: '+52 (MX)',     value: '+52' },
+];
+
+const FIELD_COLOR_PRESETS = [
+  { label: 'Default',       value: '' },
+  { label: 'Pure White',    value: '#FFFFFF' },
+  { label: 'Warm Cream',    value: '#FFF8F0' },
+  { label: 'Sky Blue',      value: '#EFF6FF' },
+  { label: 'Mint Green',    value: '#ECFDF5' },
+  { label: 'Soft Rose',     value: '#FFF1F2' },
+  { label: 'Lavender',      value: '#F5F3FF' },
+  { label: 'Charcoal',      value: '#1F2937' },
+  { label: 'Slate Dark',    value: '#0F172A' },
 ];
 
 function getDraftKey(formId: string) {
   return `inquest_draft_${formId}`;
 }
 
-// ─── Main Page ───────────────────────────────────────────────
+const initializeTheme = (serverTheme: any) => {
+  if (serverTheme?.lightMode || serverTheme?.darkMode) {
+    return serverTheme;
+  }
+
+  if (serverTheme?.backgroundColor || serverTheme?.backgroundImageUrl || serverTheme?.accentColor) {
+    const isDark = serverTheme.mode === 'dark';
+    return {
+      lightMode: {
+        backgroundColor: isDark ? '#F5EFEB' : (serverTheme.backgroundColor || '#F5EFEB'),
+        accentColor:     isDark ? '#D97436' : (serverTheme.accentColor || '#D97436'),
+        backgroundId:    isDark ? 'none'    : (serverTheme.backgroundId || 'none'),
+      },
+      darkMode: {
+        backgroundColor: isDark ? (serverTheme.backgroundColor || '#0B0705') : '#0B0705',
+        accentColor:     isDark ? (serverTheme.accentColor || '#E06F28')    : '#E06F28',
+        backgroundId:    isDark ? (serverTheme.backgroundId || 'none')      : 'none',
+      },
+      mode: serverTheme.mode || 'light',
+      fieldColor: serverTheme.fieldColor || '',
+    };
+  }
+
+  return {
+    lightMode: { backgroundColor: '#F5EFEB', accentColor: '#D97436', backgroundId: 'none' },
+    darkMode:  { backgroundColor: '#0B0705', accentColor: '#E06F28', backgroundId: 'none' },
+    mode: 'light',
+    fieldColor: '',
+  };
+};
+
+// ─── Page flip variants ───────────────────────────────────────
+const pageFlipVariants = {
+  enter: (direction: 1 | -1) => ({
+    x: direction > 0 ? '100%' : '-100%',
+    opacity: 0,
+    rotateY: direction > 0 ? 14 : -14,
+    scale: 0.97,
+    filter: 'sepia(0.25)',
+  }),
+  center: { x: 0, opacity: 1, rotateY: 0, scale: 1, filter: 'sepia(0)' },
+  exit: (direction: 1 | -1) => ({
+    x: direction > 0 ? '-100%' : '100%',
+    opacity: 0,
+    rotateY: direction > 0 ? -14 : 14,
+    scale: 0.97,
+    filter: 'sepia(0.25)',
+  }),
+};
+
+// ─── DiarySpine — unified bottom step navigation with Prev/Next ─
+
+const DiarySpine = memo(function DiarySpine({
+  currentStep,
+  onNavigate,
+}: {
+  currentStep: 1 | 2 | 3;
+  onNavigate: (step: 1 | 2 | 3) => void;
+}) {
+  const steps = [
+    { step: 1 as const, label: 'Build',   emoji: '✏️' },
+    { step: 2 as const, label: 'Theme',   emoji: '🎨' },
+    { step: 3 as const, label: 'Publish', emoji: '🚀' },
+  ];
+
+  return (
+    <div
+      className="flex items-center justify-between px-4 shrink-0"
+      style={{ paddingBottom: 0 }}
+      role="tablist"
+      aria-label="Form builder steps"
+    >
+      {/* Previous button */}
+      <button
+        onClick={() => currentStep > 1 && onNavigate((currentStep - 1) as 1 | 2 | 3)}
+        disabled={currentStep === 1}
+        className={cn(
+          'flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer',
+          currentStep === 1
+            ? 'text-inquest-ink-ghost cursor-not-allowed opacity-40'
+            : 'text-inquest-ink-soft hover:text-inquest-ink hover:bg-inquest-depth/50 border border-inquest-rule/40'
+        )}
+      >
+        <ChevronLeft size={14} />
+        <span className="hidden sm:inline">Previous</span>
+      </button>
+
+      {/* Step tabs */}
+      <div className="flex items-end justify-center gap-1.5">
+        {steps.map(({ step, label, emoji }) => {
+          const isActive = currentStep === step;
+          const isDone = step < currentStep;
+          return (
+            <motion.button
+              key={step}
+              role="tab"
+              aria-selected={isActive}
+              aria-controls={`step-panel-${step}`}
+              onClick={() => onNavigate(step)}
+              initial={false}
+              animate={{
+                y: isActive ? -6 : 0,
+                scale: isActive ? 1.04 : 1,
+              }}
+              transition={{ type: 'spring', stiffness: 340, damping: 26 }}
+              className={cn(
+                'relative flex items-center gap-2 px-5 py-2.5 cursor-pointer',
+                'text-xs font-extrabold tracking-widest uppercase',
+                'border-t border-l border-r transition-colors rounded-t-xl select-none',
+                isActive
+                  ? 'bg-inquest-accent text-white border-inquest-accent shadow-lg'
+                  : isDone
+                    ? 'bg-inquest-depth text-inquest-ink-soft border-inquest-rule hover:bg-inquest-surface hover:text-inquest-ink'
+                    : 'bg-inquest-surface/80 text-inquest-ink-soft border-inquest-rule/50 hover:bg-inquest-surface hover:text-inquest-ink'
+              )}
+              style={{ minWidth: 100 }}
+            >
+              {isDone && (
+                <Check size={11} className="shrink-0 text-inquest-accent" />
+              )}
+              <span>{step < currentStep ? '' : `0${step}·`}{label}</span>
+              {isActive && (
+                <motion.div
+                  layoutId="spine-indicator"
+                  className="absolute bottom-0 left-0 right-0 h-0.5 bg-white rounded-full"
+                />
+              )}
+            </motion.button>
+          );
+        })}
+      </div>
+
+      {/* Next button */}
+      <button
+        onClick={() => currentStep < 3 && onNavigate((currentStep + 1) as 1 | 2 | 3)}
+        disabled={currentStep === 3}
+        className={cn(
+          'flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer',
+          currentStep === 3
+            ? 'text-inquest-ink-ghost cursor-not-allowed opacity-40'
+            : 'text-inquest-accent hover:bg-inquest-accent/10 border border-inquest-accent/30'
+        )}
+      >
+        <span className="hidden sm:inline">Next</span>
+        <ChevronRight size={14} />
+      </button>
+    </div>
+  );
+});
+
+// ─── FieldTypeGrid ─────────────────────────────────────────────
+
+const FieldTypeGrid = memo(function FieldTypeGrid({
+  currentType,
+  onSelect,
+}: {
+  currentType: string;
+  onSelect: (type: string) => void;
+}) {
+  return (
+    <div className="grid grid-cols-5 gap-1.5">
+      {FIELD_TYPES.map(({ type, label, icon: Icon }) => {
+        const isActive = currentType === type;
+        return (
+          <button
+            key={type}
+            type="button"
+            onClick={() => onSelect(type)}
+            title={label}
+            className={cn(
+              'field-type-pill flex flex-col items-center justify-center gap-1 p-2 rounded-xl border text-center cursor-pointer',
+              isActive
+                ? 'active border-inquest-accent bg-inquest-accent/10 text-inquest-accent'
+                : 'border-inquest-rule/50 bg-inquest-base/40 text-inquest-ink-soft hover:border-inquest-accent/50 hover:text-inquest-ink'
+            )}
+          >
+            <Icon size={15} />
+            <span className="text-[9px] font-bold leading-tight">{label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+});
+
+// ─── InlineFieldConfig ─────────────────────────────────────────
+
+const InlineFieldConfig = memo(function InlineFieldConfig({
+  field,
+  onUpdate,
+  onClose,
+}: {
+  field: FormField;
+  onUpdate: (updates: Partial<FormField>) => void;
+  onClose: () => void;
+}) {
+  const v = field.validation || {};
+
+  const setValidation = (patch: Partial<FieldValidation>) => {
+    onUpdate({ validation: { ...v, ...patch } });
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -8 }}
+      transition={{ duration: 0.18 }}
+      className="mt-4 pt-4 border-t border-inquest-rule/40 space-y-4"
+      onClick={(e) => e.stopPropagation()}
+    >
+      {/* Label */}
+      <div>
+        <label className="block text-[10px] font-bold text-inquest-ink-soft uppercase tracking-wider mb-1.5">Question Label</label>
+        <input
+          type="text"
+          value={field.label}
+          onChange={(e) => onUpdate({ label: e.target.value })}
+          className="w-full bg-inquest-base border border-inquest-rule focus:border-inquest-accent rounded-xl px-3 py-2 text-inquest-ink text-sm focus:ring-1 focus:ring-inquest-accent/30 transition-colors"
+          placeholder="What is your question?"
+        />
+      </div>
+
+      {/* Placeholder */}
+      <div>
+        <label className="block text-[10px] font-bold text-inquest-ink-soft uppercase tracking-wider mb-1.5">Placeholder / Hint</label>
+        <input
+          type="text"
+          value={field.placeholder || ''}
+          onChange={(e) => onUpdate({ placeholder: e.target.value })}
+          className="w-full bg-inquest-base border border-inquest-rule focus:border-inquest-accent rounded-xl px-3 py-2 text-inquest-ink text-sm transition-colors"
+          placeholder="Guide the respondent…"
+        />
+      </div>
+
+      {/* Field type */}
+      <div>
+        <label className="block text-[10px] font-bold text-inquest-ink-soft uppercase tracking-wider mb-2">Field Type</label>
+        <FieldTypeGrid
+          currentType={field.type}
+          onSelect={(newType) => {
+            const newVal =
+              newType === 'single_select' || newType === 'multi_select'
+                ? { options: ['Option 1', 'Option 2'] }
+                : newType === 'rating'
+                  ? { min: 1, max: 5 }
+                  : null;
+            onUpdate({ type: newType, validation: newVal });
+          }}
+        />
+      </div>
+
+      {/* Required toggle */}
+      <div className="flex items-center justify-between bg-inquest-base p-3 rounded-xl border border-inquest-rule">
+        <div>
+          <span className="text-xs font-bold text-inquest-ink-mid uppercase tracking-wider block">Required</span>
+          <span className="text-[10px] text-inquest-ink-ghost">Respondent must answer this</span>
+        </div>
+        <Switch
+          checked={field.required}
+          onCheckedChange={(val) => onUpdate({ required: val })}
+          className="data-[state=checked]:bg-inquest-accent"
+        />
+      </div>
+
+      {/* Validation — type-specific */}
+      <div className="space-y-3">
+        <span className="text-[10px] font-bold text-inquest-ink-ghost uppercase tracking-wider">Validation Constraints</span>
+
+        {(field.type === 'text' || field.type === 'textarea') && (
+          <div className="space-y-2">
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-[9px] font-bold text-inquest-ink-soft uppercase mb-1">Min Chars</label>
+                <input type="number" min={0} value={v.minLength ?? ''} onChange={(e) => setValidation({ minLength: e.target.value ? Number(e.target.value) : undefined })}
+                  className="w-full bg-inquest-base border border-inquest-rule rounded-lg px-2 py-1.5 text-xs text-inquest-ink" placeholder="None" />
+              </div>
+              <div>
+                <label className="block text-[9px] font-bold text-inquest-ink-soft uppercase mb-1">Max Chars</label>
+                <input type="number" min={0} value={v.maxLength ?? ''} onChange={(e) => setValidation({ maxLength: e.target.value ? Number(e.target.value) : undefined })}
+                  className="w-full bg-inquest-base border border-inquest-rule rounded-lg px-2 py-1.5 text-xs text-inquest-ink" placeholder="None" />
+              </div>
+            </div>
+            <div>
+              <label className="block text-[9px] font-bold text-inquest-ink-soft uppercase mb-1">Regex Pattern</label>
+              <input type="text" value={v.pattern ?? ''} onChange={(e) => setValidation({ pattern: e.target.value || undefined })}
+                className="w-full bg-inquest-base border border-inquest-rule rounded-lg px-2 py-1.5 text-xs font-mono text-inquest-ink" placeholder="e.g. ^[A-Z]+" />
+            </div>
+          </div>
+        )}
+
+        {field.type === 'number' && (
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="block text-[9px] font-bold text-inquest-ink-soft uppercase mb-1">Min Value</label>
+              <input type="number" value={v.min ?? ''} onChange={(e) => setValidation({ min: e.target.value ? Number(e.target.value) : undefined })}
+                className="w-full bg-inquest-base border border-inquest-rule rounded-lg px-2 py-1.5 text-xs text-inquest-ink" placeholder="None" />
+            </div>
+            <div>
+              <label className="block text-[9px] font-bold text-inquest-ink-soft uppercase mb-1">Max Value</label>
+              <input type="number" value={v.max ?? ''} onChange={(e) => setValidation({ max: e.target.value ? Number(e.target.value) : undefined })}
+                className="w-full bg-inquest-base border border-inquest-rule rounded-lg px-2 py-1.5 text-xs text-inquest-ink" placeholder="None" />
+            </div>
+          </div>
+        )}
+
+        {field.type === 'date' && (
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="block text-[9px] font-bold text-inquest-ink-soft uppercase mb-1">Earliest</label>
+              <input type="date" value={v.minDate ?? ''} onChange={(e) => setValidation({ minDate: e.target.value || undefined })}
+                className="w-full bg-inquest-base border border-inquest-rule rounded-lg px-2 py-1 text-xs text-inquest-ink" />
+            </div>
+            <div>
+              <label className="block text-[9px] font-bold text-inquest-ink-soft uppercase mb-1">Latest</label>
+              <input type="date" value={v.maxDate ?? ''} onChange={(e) => setValidation({ maxDate: e.target.value || undefined })}
+                className="w-full bg-inquest-base border border-inquest-rule rounded-lg px-2 py-1 text-xs text-inquest-ink" />
+            </div>
+          </div>
+        )}
+
+        {field.type === 'phone' && (
+          <div className="space-y-2">
+            <div>
+              <label className="block text-[9px] font-bold text-inquest-ink-soft uppercase mb-1">Dial Prefix</label>
+              <select value={v.countryCode ?? ''} onChange={(e) => setValidation({ countryCode: e.target.value || undefined })}
+                className="w-full bg-inquest-base border border-inquest-rule rounded-lg px-2 py-1.5 text-xs text-inquest-ink focus:outline-none">
+                {COUNTRY_CODES.map((c) => (<option key={c.value} value={c.value}>{c.label}</option>))}
+              </select>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-[9px] font-bold text-inquest-ink-soft uppercase mb-1">Min Digits</label>
+                <input type="number" min={0} value={v.minLength ?? ''} onChange={(e) => setValidation({ minLength: e.target.value ? Number(e.target.value) : undefined })}
+                  className="w-full bg-inquest-base border border-inquest-rule rounded-lg px-2 py-1.5 text-xs text-inquest-ink" />
+              </div>
+              <div>
+                <label className="block text-[9px] font-bold text-inquest-ink-soft uppercase mb-1">Max Digits</label>
+                <input type="number" min={0} value={v.maxLength ?? ''} onChange={(e) => setValidation({ maxLength: e.target.value ? Number(e.target.value) : undefined })}
+                  className="w-full bg-inquest-base border border-inquest-rule rounded-lg px-2 py-1.5 text-xs text-inquest-ink" />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {field.type === 'rating' && (
+          <div>
+            <label className="block text-[9px] font-bold text-inquest-ink-soft uppercase mb-1">Max Stars</label>
+            <input type="number" min={1} max={10} value={v.max ?? 5} onChange={(e) => setValidation({ max: e.target.value ? Number(e.target.value) : 5 })}
+              className="w-full bg-inquest-base border border-inquest-rule rounded-lg px-2.5 py-1.5 text-xs text-inquest-ink font-bold" />
+          </div>
+        )}
+
+        {(field.type === 'single_select' || field.type === 'multi_select') && (
+          <div className="space-y-2">
+            <label className="block text-[9px] font-bold text-inquest-ink-soft uppercase">Choice Options</label>
+            {(v.options || []).map((opt: string, i: number) => (
+              <div key={i} className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={opt}
+                  onChange={(e) => {
+                    const opts = [...(v.options || [])];
+                    opts[i] = e.target.value;
+                    setValidation({ options: opts });
+                  }}
+                  className="flex-1 bg-inquest-base border border-inquest-rule rounded-lg px-2 py-1 text-xs text-inquest-ink"
+                />
+                <button onClick={() => setValidation({ options: (v.options || []).filter((_: any, j: number) => j !== i) })}
+                  className="p-1 text-inquest-ink-soft hover:text-inquest-caution transition-colors">
+                  <Trash2 size={11} />
+                </button>
+              </div>
+            ))}
+            {field.type === 'multi_select' && (
+              <div>
+                <label className="block text-[9px] font-bold text-inquest-ink-soft uppercase mb-1">Max Selections</label>
+                <input type="number" min={1} value={v.maxSelections ?? ''} onChange={(e) => setValidation({ maxSelections: e.target.value ? Number(e.target.value) : undefined })}
+                  className="w-full bg-inquest-base border border-inquest-rule rounded-lg px-2 py-1.5 text-xs text-inquest-ink" placeholder="Unlimited" />
+              </div>
+            )}
+            <button
+              onClick={() => setValidation({ options: [...(v.options || []), `Option ${(v.options?.length || 0) + 1}`] })}
+              className="text-xs text-inquest-accent font-bold hover:underline flex items-center gap-1 mt-1"
+            >
+              <Plus size={11} /> Add Option
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Close button */}
+      <div className="flex justify-end pt-2">
+        <button
+          onClick={onClose}
+          className="flex items-center gap-1.5 px-4 py-2 bg-inquest-depth hover:bg-inquest-rule text-inquest-ink text-xs font-bold rounded-xl transition-colors cursor-pointer border border-inquest-rule/30"
+        >
+          <Check size={12} /> Done
+        </button>
+      </div>
+    </motion.div>
+  );
+});
+
+// ─── FieldCard ─────────────────────────────────────────────────
+
+const FieldCard = memo(function FieldCard({
+  field,
+  idx,
+  isExpanded,
+  onToggleExpand,
+  onUpdate,
+  onRemove,
+}: {
+  field: FormField;
+  idx: number;
+  isExpanded: boolean;
+  onToggleExpand: () => void;
+  onUpdate: (updates: Partial<FormField>) => void;
+  onRemove: (idx: number, e: React.MouseEvent) => void;
+}) {
+  const dragControls = useDragControls();
+  const fieldTypeMeta = FIELD_TYPES.find((t) => t.type === field.type);
+  const FieldIcon = fieldTypeMeta?.icon ?? Type;
+
+  return (
+    <Reorder.Item
+      value={field}
+      dragListener={false}
+      dragControls={dragControls}
+      layout="position"
+      layoutId={field.localId}
+      whileDrag={{
+        scale: 1.025,
+        rotate: 1.2,
+        boxShadow: '0 28px 54px -8px rgba(200, 90, 23, 0.38)',
+        opacity: 0.96,
+        zIndex: 50,
+      }}
+      transition={{ layout: { duration: 0.22, ease: 'easeInOut' } }}
+      className={cn(
+        'bg-inquest-surface rounded-[1.75rem] border transition-all select-none',
+        'group relative overflow-hidden',
+        isExpanded
+          ? 'border-inquest-accent warm-shadow dark:field-selected'
+          : 'border-inquest-rule/60 field-card-lift hover:border-inquest-rule'
+      )}
+    >
+      {/* Accent left stripe */}
+      <div
+        className="absolute left-0 top-0 bottom-0 w-1 rounded-l-[1.75rem] transition-all duration-300"
+        style={{
+          background: isExpanded
+            ? 'var(--color-inquest-accent)'
+            : 'transparent',
+        }}
+      />
+
+      {/* Giant watermark question number */}
+      <div
+        className="absolute right-4 top-2 text-6xl font-serif font-black text-inquest-accent/8 dark:text-inquest-accent/12 pointer-events-none select-none leading-none"
+        aria-hidden="true"
+      >
+        Q{idx + 1}
+      </div>
+
+      {/* Card header — always visible */}
+      <div className="flex items-start gap-0 p-5 sm:p-6">
+        {/* Drag Handle */}
+        <div
+          onPointerDown={(e) => {
+            e.preventDefault();
+            dragControls.start(e);
+          }}
+          style={{ touchAction: 'none', userSelect: 'none' }}
+          title="Drag to reorder"
+          aria-label="Drag to reorder field"
+          className="flex-shrink-0 w-8 flex flex-col items-center justify-center gap-1 pt-1 cursor-grab active:cursor-grabbing text-inquest-ink-ghost hover:text-inquest-ink-soft transition-colors mr-2"
+        >
+          <GripVertical size={18} />
+        </div>
+
+        {/* Field content */}
+        <div
+          className="flex-1 min-w-0 cursor-pointer"
+          onClick={onToggleExpand}
+          aria-expanded={isExpanded}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => e.key === 'Enter' && onToggleExpand()}
+        >
+          <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+            <span className="text-[10px] font-bold text-inquest-ink-ghost uppercase tracking-wider">
+              Q{idx + 1}
+            </span>
+            <span className="flex items-center gap-1 text-[9px] font-bold text-inquest-ink-soft bg-inquest-depth px-2 py-0.5 rounded-full">
+              <FieldIcon size={9} />
+              {fieldTypeMeta?.label}
+            </span>
+            {field.required && (
+              <motion.span
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                className="text-[9px] font-bold text-inquest-caution bg-inquest-caution/10 px-2 py-0.5 rounded-full"
+              >
+                Required
+              </motion.span>
+            )}
+          </div>
+          <h3 className="text-lg font-serif font-bold text-inquest-ink break-words leading-tight pr-8">
+            {field.label || 'Untitled Question'}
+          </h3>
+          {field.placeholder && !isExpanded && (
+            <p className="text-xs text-inquest-ink-ghost mt-0.5 italic truncate">
+              {field.placeholder}
+            </p>
+          )}
+        </div>
+
+        {/* Right controls — including quick required toggle */}
+        <div className="flex items-center gap-1 shrink-0 ml-2">
+          {/* Quick required toggle — visible on collapsed cards */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onUpdate({ required: !field.required });
+            }}
+            aria-label={field.required ? 'Mark as optional' : 'Mark as required'}
+            title={field.required ? 'Click to make optional' : 'Click to make required'}
+            className={cn(
+              'p-2 rounded-xl transition-colors cursor-pointer',
+              field.required
+                ? 'text-inquest-caution bg-inquest-caution/10 hover:bg-inquest-caution/20'
+                : 'text-inquest-ink-ghost hover:text-inquest-ink-soft hover:bg-inquest-depth/50'
+            )}
+          >
+            <Asterisk size={14} />
+          </button>
+          <button
+            onClick={onToggleExpand}
+            aria-label={isExpanded ? 'Collapse field config' : 'Expand field config'}
+            className="p-2 text-inquest-ink-soft hover:text-inquest-ink rounded-xl hover:bg-inquest-depth/50 transition-colors cursor-pointer"
+          >
+            {isExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+          </button>
+          <button
+            onClick={(e) => onRemove(idx, e)}
+            aria-label="Remove field"
+            className="p-2 text-inquest-ink-soft hover:text-inquest-caution hover:bg-red-50 dark:hover:bg-red-950/20 rounded-xl transition-colors cursor-pointer"
+          >
+            <Trash2 size={14} />
+          </button>
+        </div>
+      </div>
+
+      {/* Inline config — accordion expand */}
+      <AnimatePresence initial={false}>
+        {isExpanded && (
+          <motion.div
+            key="config"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ height: { duration: 0.25, ease: 'easeInOut' }, opacity: { duration: 0.15 } }}
+            className="overflow-hidden px-5 sm:px-6 pb-5 sm:pb-6"
+          >
+            <InlineFieldConfig
+              field={field}
+              onUpdate={onUpdate}
+              onClose={onToggleExpand}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </Reorder.Item>
+  );
+});
+
+// ─── AddFieldStrip ─────────────────────────────────────────────
+
+const AddFieldStrip = memo(function AddFieldStrip({
+  onAdd,
+  isOpen,
+  onToggle,
+}: {
+  onAdd: (type: string) => void;
+  isOpen: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <div className="relative">
+      {/* The strip line */}
+      <button
+        onClick={onToggle}
+        aria-expanded={isOpen}
+        aria-label="Add a new question"
+        className={cn(
+          'w-full flex items-center justify-center gap-3 py-3.5 rounded-2xl border-2 border-dashed transition-all cursor-pointer group',
+          isOpen
+            ? 'border-inquest-accent bg-inquest-accent/5 text-inquest-accent'
+            : 'border-inquest-rule/50 text-inquest-ink-ghost hover:border-inquest-accent/50 hover:text-inquest-ink-soft'
+        )}
+      >
+        <div className={cn('transition-transform duration-200', isOpen ? 'rotate-45' : '')}>
+          <Plus size={16} />
+        </div>
+        <span className="text-xs font-bold uppercase tracking-widest">Add a Question</span>
+        <div className={cn('transition-transform duration-200', isOpen ? 'rotate-45' : '')}>
+          <Plus size={16} />
+        </div>
+      </button>
+
+      {/* Field type grid — slides down */}
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: -8, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -8, scale: 0.97 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 28 }}
+            className="mt-2 bg-inquest-surface border border-inquest-rule rounded-[1.5rem] p-5 shadow-xl"
+          >
+            <p className="text-[10px] font-bold text-inquest-ink-soft uppercase tracking-wider mb-3">
+              Choose a field type
+            </p>
+            <div className="grid grid-cols-5 gap-2">
+              {FIELD_TYPES.map(({ type, label, icon: Icon }) => (
+                <motion.button
+                  key={type}
+                  whileHover={{ scale: 1.06, y: -2 }}
+                  whileTap={{ scale: 0.96 }}
+                  onClick={() => {
+                    onAdd(type);
+                    onToggle();
+                  }}
+                  className="flex flex-col items-center justify-center gap-1.5 p-3 bg-inquest-base/50 border border-inquest-rule/50 rounded-xl hover:border-inquest-accent hover:bg-inquest-accent/5 transition-colors cursor-pointer"
+                >
+                  <Icon size={18} className="text-inquest-ink-soft" />
+                  <span className="text-[9px] font-bold text-inquest-ink text-center leading-tight">{label}</span>
+                </motion.button>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+});
+
+// ─── ThemeControlPanel ───────────────────────────────────────
+
+const ThemeControlPanel = memo(function ThemeControlPanel({
+  theme,
+  setTheme,
+  previewMode,
+  setPreviewMode,
+}: {
+  theme: Record<string, any>;
+  setTheme: React.Dispatch<React.SetStateAction<Record<string, any>>>;
+  previewMode: 'light' | 'dark';
+  setPreviewMode: (m: 'light' | 'dark') => void;
+}) {
+  const [isExpanded, setIsExpanded] = useState(true);
+
+  const LIGHT_THEMES = [
+    { name: 'Warm Parchment',   bg: '#F5EFEB', accent: '#D97436', bgId: 'none' },
+    { name: 'Linen Cream',      bg: '#FEFAF3', accent: '#B56B20', bgId: 'none' },
+    { name: 'Dusty Rose Diary', bg: '#FDF0EF', accent: '#C45E5E', bgId: 'none' },
+    { name: 'Sage Notebook',    bg: '#F3F5F0', accent: '#5E7A5E', bgId: 'none' },
+  ];
+
+  const DARK_THEMES = [
+    { name: 'Midnight Studio', bg: '#0B0705', accent: '#E06F28', bgId: 'none' },
+    { name: 'Deep Ocean',      bg: '#070B12', accent: '#2980B9', bgId: 'none' },
+    { name: 'Ink Well',        bg: '#0D0D0D', accent: '#D4AF37', bgId: 'none' },
+    { name: 'Charcoal Draft',  bg: '#131313', accent: '#8B7355', bgId: 'none' },
+  ];
+
+  const currentModeConfig = previewMode === 'dark' ? theme.darkMode : theme.lightMode;
+  const currentBgId      = currentModeConfig?.backgroundId || 'none';
+  const currentAccent    = currentModeConfig?.accentColor   || (previewMode === 'dark' ? '#E06F28' : '#D97436');
+  const currentBgColor   = currentModeConfig?.backgroundColor || (previewMode === 'dark' ? '#0B0705' : '#F5EFEB');
+  const currentFieldColor = theme.fieldColor || '';
+
+  const updateModeTheme = (patch: Partial<{ backgroundColor: string; accentColor: string; backgroundId: string }>) => {
+    const key = previewMode === 'dark' ? 'darkMode' : 'lightMode';
+    setTheme((prev) => ({ ...prev, [key]: { ...prev[key], ...patch } }));
+  };
+
+  // Filter backgrounds by mode
+  const filteredBgs = backgroundsData.backgrounds.filter((bg) =>
+    previewMode === 'dark'
+      ? true  // dark mode shows all (including darkOnly)
+      : !(bg as any).darkOnly  // light mode hides darkOnly backgrounds
+  );
+
+  return (
+    <motion.div
+      className="shrink-0 border-t border-inquest-rule/50 bg-inquest-surface/98 backdrop-blur-md"
+      style={{ position: 'relative', zIndex: 20 }}
+      initial={false}
+      animate={{ height: isExpanded ? 'auto' : 64 }}
+      transition={{ type: 'spring', stiffness: 220, damping: 30 }}
+    >
+      {/* Collapsed bar — always visible */}
+      <div className="flex items-center justify-between px-5 py-3.5 border-b border-inquest-rule/30">
+        {/* Mode toggle — ONLY changes previewMode, NOT document.documentElement */}
+        <div className="flex items-center gap-1 bg-inquest-base border border-inquest-rule rounded-lg p-0.5">
+          <button
+            type="button"
+            onClick={() => { setPreviewMode('light'); setTheme((p) => ({ ...p, mode: 'light' })); }}
+            className={cn('flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer', previewMode === 'light' ? 'bg-inquest-surface text-inquest-accent shadow-sm' : 'text-inquest-ink-soft hover:text-inquest-ink')}
+          >
+            <Sun size={11} /> Light
+          </button>
+          <button
+            type="button"
+            onClick={() => { setPreviewMode('dark'); setTheme((p) => ({ ...p, mode: 'dark' })); }}
+            className={cn('flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer', previewMode === 'dark' ? 'bg-inquest-surface text-inquest-accent shadow-sm' : 'text-inquest-ink-soft hover:text-inquest-ink')}
+          >
+            <Moon size={11} /> Dark
+          </button>
+        </div>
+
+        {/* Active preset name */}
+        <span className="text-xs text-inquest-ink-soft font-medium hidden sm:block">
+          <Palette size={11} className="inline mr-1.5 text-inquest-accent" />
+          Customize Theme
+        </span>
+
+        {/* Expand / collapse */}
+        <button
+          onClick={() => setIsExpanded(!isExpanded)}
+          aria-label={isExpanded ? 'Collapse theme panel' : 'Expand theme panel'}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-inquest-depth hover:bg-inquest-rule rounded-lg text-xs font-bold text-inquest-ink-mid transition-colors cursor-pointer border border-inquest-rule/30"
+        >
+          {isExpanded ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
+          {isExpanded ? 'Collapse' : 'Expand'}
+        </button>
+      </div>
+
+      {/* Expanded content */}
+      <AnimatePresence>
+        {isExpanded && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="px-5 py-4 space-y-4 overflow-y-auto"
+            style={{ maxHeight: 'calc(100vh - 280px)' }}
+          >
+            {/* Preset swatches */}
+            <div>
+              <span className="text-[10px] font-bold text-inquest-ink-soft uppercase tracking-wider block mb-2">
+                {previewMode === 'light' ? '☀️ Light' : '🌙 Dark'} Presets
+              </span>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {(previewMode === 'dark' ? DARK_THEMES : LIGHT_THEMES).map((preset) => {
+                  const isActive = currentBgColor === preset.bg && currentAccent === preset.accent;
+                  return (
+                    <button
+                      key={preset.name}
+                      type="button"
+                      onClick={() => updateModeTheme({ backgroundColor: preset.bg, accentColor: preset.accent, backgroundId: preset.bgId })}
+                      className={cn(
+                        'preset-card rounded-xl border p-3 flex flex-col items-start gap-2 cursor-pointer text-left',
+                        isActive
+                          ? 'selected border-inquest-accent ring-1 ring-inquest-accent shadow-md'
+                          : 'border-inquest-rule hover:border-inquest-ink-soft'
+                      )}
+                      style={{ backgroundColor: preset.bg }}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-4 h-4 rounded-full border-2 border-white/30" style={{ backgroundColor: preset.accent }} />
+                        {isActive && <Check size={10} className="text-inquest-accent" style={{ filter: 'drop-shadow(0 0 4px currentColor)' }} />}
+                      </div>
+                      <span
+                        className="text-[9px] font-bold leading-tight"
+                        style={{ color: previewMode === 'dark' ? '#F2EBE5' : '#3A2312' }}
+                      >
+                        {preset.name}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Background textures */}
+            <div>
+              <span className="text-[10px] font-bold text-inquest-ink-soft uppercase tracking-wider block mb-2">Background Texture</span>
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {filteredBgs.map((bg) => (
+                  <button
+                    key={bg.id}
+                    type="button"
+                    onClick={() => updateModeTheme({ backgroundId: bg.id })}
+                    title={bg.label}
+                    className={cn(
+                      'bg-tile shrink-0 rounded-xl overflow-hidden border-2 transition-all cursor-pointer',
+                      currentBgId === bg.id
+                        ? 'active border-inquest-accent ring-1 ring-inquest-accent'
+                        : 'border-inquest-rule/60 hover:border-inquest-rule'
+                    )}
+                    style={{ width: 64, height: 48 }}
+                  >
+                    {bg.thumbnail ? (
+                      <img src={bg.thumbnail} className="w-full h-full object-cover" alt={bg.label} loading="lazy" />
+                    ) : (
+                      <div className="w-full h-full bg-inquest-depth flex items-center justify-center">
+                        <span className="text-[7px] font-bold text-inquest-ink-ghost">None</span>
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Color pickers */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex items-center justify-between bg-inquest-base px-3 py-2.5 rounded-xl border border-inquest-rule">
+                <div>
+                  <span className="text-[10px] font-bold text-inquest-ink-mid block">Accent</span>
+                  <span className="text-[8px] text-inquest-ink-ghost">Buttons & highlights</span>
+                </div>
+                <input
+                  type="color"
+                  value={currentAccent}
+                  onChange={(e) => updateModeTheme({ accentColor: e.target.value })}
+                  className="w-8 h-8 rounded-lg border-0 cursor-pointer bg-transparent p-0"
+                  title="Accent color"
+                />
+              </div>
+              <div className="flex items-center justify-between bg-inquest-base px-3 py-2.5 rounded-xl border border-inquest-rule">
+                <div>
+                  <span className="text-[10px] font-bold text-inquest-ink-mid block">Base</span>
+                  <span className="text-[8px] text-inquest-ink-ghost">Background color</span>
+                </div>
+                <input
+                  type="color"
+                  value={currentBgColor}
+                  onChange={(e) => {
+                    const color = e.target.value;
+                    const cleaned = color.replace('#', '');
+                    const r = parseInt(cleaned.substring(0, 2), 16);
+                    const g = parseInt(cleaned.substring(2, 4), 16);
+                    const b = parseInt(cleaned.substring(4, 6), 16);
+                    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+                    
+                    if (previewMode === 'light') {
+                      if (luminance < 0.5) {
+                        toast.warning("Background must be light in Light Mode. Auto-adjusting.");
+                        updateModeTheme({ backgroundColor: '#FAF5F2' });
+                        return;
+                      }
+                    } else {
+                      if (luminance > 0.4) {
+                        toast.warning("Background must be dark in Dark Mode. Auto-adjusting.");
+                        updateModeTheme({ backgroundColor: '#0F0A08' });
+                        return;
+                      }
+                    }
+                    updateModeTheme({ backgroundColor: color });
+                  }}
+                  className="w-8 h-8 rounded-lg border-0 cursor-pointer bg-transparent p-0"
+                  title="Base background color"
+                />
+              </div>
+            </div>
+
+            {/* ── Field Card Color ─────────────────────────── */}
+            <div>
+              <span className="text-[10px] font-bold text-inquest-ink-soft uppercase tracking-wider block mb-2">
+                🎨 Form Field Color
+              </span>
+              <div className="flex gap-2 flex-wrap">
+                {(() => {
+                  const filtered = FIELD_COLOR_PRESETS.filter(preset => {
+                    if (!preset.value) return true;
+                    const cleaned = preset.value.replace('#', '');
+                    const r = parseInt(cleaned.substring(0, 2), 16);
+                    const g = parseInt(cleaned.substring(2, 4), 16);
+                    const b = parseInt(cleaned.substring(4, 6), 16);
+                    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+                    return previewMode === 'light' ? luminance > 0.5 : luminance <= 0.5;
+                  });
+                  return filtered.map((preset) => {
+                    const isActive = currentFieldColor === preset.value;
+                    const isDark = preset.value && parseInt(preset.value.slice(1, 3), 16) < 80;
+                    return (
+                      <button
+                        key={preset.label}
+                        type="button"
+                        onClick={() => setTheme((prev) => ({ ...prev, fieldColor: preset.value }))}
+                        title={preset.label}
+                        className={cn(
+                          'w-9 h-9 rounded-xl border-2 transition-all cursor-pointer flex items-center justify-center',
+                          isActive
+                            ? 'border-inquest-accent ring-1 ring-inquest-accent scale-110'
+                            : 'border-inquest-rule/60 hover:border-inquest-rule hover:scale-105'
+                        )}
+                        style={{ backgroundColor: preset.value || 'var(--color-inquest-surface)' }}
+                      >
+                        {isActive && <Check size={12} className={isDark ? 'text-white' : 'text-inquest-accent'} />}
+                      </button>
+                    );
+                  });
+                })()}
+                {/* Custom color picker */}
+                <div className="relative w-9 h-9">
+                  <input
+                    type="color"
+                    value={currentFieldColor || '#FFFFFF'}
+                    onChange={(e) => {
+                      const color = e.target.value;
+                      const cleaned = color.replace('#', '');
+                      const r = parseInt(cleaned.substring(0, 2), 16);
+                      const g = parseInt(cleaned.substring(2, 4), 16);
+                      const b = parseInt(cleaned.substring(4, 6), 16);
+                      const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+                      if (previewMode === 'light' && luminance < 0.5) {
+                        toast.warning("Fields must be light in Light Mode. Auto-adjusting.");
+                        setTheme((prev) => ({ ...prev, fieldColor: '#FFFFFF' }));
+                        return;
+                      }
+                      if (previewMode === 'dark' && luminance > 0.4) {
+                        toast.warning("Fields must be dark in Dark Mode. Auto-adjusting.");
+                        setTheme((prev) => ({ ...prev, fieldColor: '#1F2937' }));
+                        return;
+                      }
+                      setTheme((prev) => ({ ...prev, fieldColor: color }));
+                    }}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    title="Custom field color"
+                  />
+                  <div className={cn(
+                    'w-9 h-9 rounded-xl border-2 flex items-center justify-center pointer-events-none',
+                    'border-inquest-rule/60 bg-gradient-to-br from-red-200 via-green-200 to-blue-200'
+                  )}>
+                    <Palette size={12} className="text-inquest-ink-mid" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+});
+
+// ─── Main Page ────────────────────────────────────────────────
 
 export default function FormBuilderPage() {
-  const params = useParams();
-  const router = useRouter();
-  const formId = params?.formId as string;
+  const params   = useParams();
+  const router   = useRouter();
+  const formId   = params?.formId as string;
   const { user } = useGetuser();
-
-  const utils = trpc.useUtils();
+  const utils    = trpc.useUtils();
 
   const { data: form, isLoading } = trpc.form.getFormById.useQuery(
     { id: formId },
@@ -120,40 +1083,31 @@ export default function FormBuilderPage() {
     { enabled: !!formId }
   );
 
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
+  // Wizard state
+  const [currentStep, setCurrentStep]   = useState<1 | 2 | 3>(1);
+  const [stepDirection, setStepDirection] = useState<1 | -1>(1);
+
+  // Form data
+  const [title, setTitle]                           = useState('');
+  const [description, setDescription]               = useState('');
   const [isOpenForSubmission, setIsOpenForSubmission] = useState(true);
-  const [requiresAuth, setRequiresAuth] = useState(true);
-  const [secureCode, setSecureCode] = useState<string | null>(null);
-  const [theme, setTheme] = useState<Record<string, any>>({});
-  const [fields, setFields] = useState<FormField[]>([]);
-  const [selectedFieldIndex, setSelectedFieldIndex] = useState<number | null>(null);
-  const [showMobileSidebar, setShowMobileSidebar] = useState(false);
+  const [requiresAuth, setRequiresAuth]             = useState(true);
+  const [secureCode, setSecureCode]                 = useState<string | null>(null);
+  const [theme, setTheme]                           = useState<Record<string, any>>({});
+  const [fields, setFields]                         = useState<FormField[]>([]);
+
+  // Builder UI state
+  const [expandedFieldIdx, setExpandedFieldIdx] = useState<number | null>(null);
+  const [showAddStrip, setShowAddStrip]         = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [deleteConfirmInput, setDeleteConfirmInput] = useState('');
-  const [showDescriptionModal, setShowDescriptionModal] = useState(false);
-  const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [hasDraft, setHasDraft] = useState(false);
-  const [shareUrl, setShareUrl] = useState('');
-  const [activeSidebarTab, setActiveSidebarTab] = useState<'question' | 'settings'>('settings');
-  const [darkMode, setDarkMode] = useState(false);
+  const [hasDraft, setHasDraft]                 = useState(false);
+  const [shareUrl, setShareUrl]                 = useState('');
+  const [previewMode, setPreviewMode]           = useState<'light' | 'dark'>('light');
 
-  useEffect(() => {
-    if (theme?.mode === 'dark') {
-      document.documentElement.classList.add('dark');
-      setDarkMode(true);
-    } else if (theme?.mode === 'light') {
-      document.documentElement.classList.remove('dark');
-      setDarkMode(false);
-    }
-  }, [theme?.mode]);
+  // BUG FIX (C5): We do NOT touch document.documentElement.classList for preview mode.
+  // The preview is scoped via inline styles in FormPreview only.
 
-  const toggleDarkMode = () => {
-    const isDark = !darkMode;
-    setDarkMode(isDark);
-    setTheme((prev: any) => ({ ...prev, mode: isDark ? 'dark' : 'light' }));
-  };
-
+  // Build share URL
   useEffect(() => {
     if (typeof window !== 'undefined') {
       let url = `${window.location.origin}/forms/${formId}`;
@@ -162,15 +1116,12 @@ export default function FormBuilderPage() {
     }
   }, [formId, secureCode]);
 
-  // Track whether we loaded from server yet (to avoid overwriting draft on re-renders)
   const loadedFromServer = useRef(false);
 
-  // Sync server data on first load
   useEffect(() => {
     if (!form || loadedFromServer.current) return;
     loadedFromServer.current = true;
 
-    // Check for a saved draft
     const draftRaw = localStorage.getItem(getDraftKey(formId));
     if (draftRaw) {
       try {
@@ -180,7 +1131,7 @@ export default function FormBuilderPage() {
         setIsOpenForSubmission(draft.isOpenForSubmission !== undefined ? draft.isOpenForSubmission : true);
         setRequiresAuth(draft.requiresAuth !== undefined ? draft.requiresAuth : true);
         setSecureCode(draft.secureCode !== undefined ? draft.secureCode : null);
-        setTheme(draft.theme !== undefined ? draft.theme : {});
+        setTheme(initializeTheme(draft.theme));
         setFields(draft.fields);
         setHasDraft(true);
         return;
@@ -188,8 +1139,6 @@ export default function FormBuilderPage() {
         localStorage.removeItem(getDraftKey(formId));
       }
     }
-
-    // No draft — load from server
     applyServerData(form);
   }, [form, formId]);
 
@@ -199,51 +1148,42 @@ export default function FormBuilderPage() {
     setIsOpenForSubmission(serverForm.isOpenForSubmission);
     setRequiresAuth(serverForm.requiresAuth);
     setSecureCode(serverForm.secureCode);
-    setTheme((serverForm.theme as Record<string, any>) || {});
-    const sorted = [...serverForm.fields].sort(
-      (a, b) => Number(a.orderIndex) - Number(b.orderIndex)
-    );
-    setFields(
-      sorted.map((f, i) => ({
-        id: f.id,
-        localId: f.id,
-        label: f.label,
-        type: f.type,
-        required: f.required,
-        placeholder: f.placeholder,
-        validation: f.validation as FieldValidation | null,
-        orderIndex: Number(f.orderIndex),
-      }))
-    );
+    setTheme(initializeTheme(serverForm.theme));
+    const sorted = [...serverForm.fields].sort((a, b) => Number(a.orderIndex) - Number(b.orderIndex));
+    setFields(sorted.map((f) => ({
+      id: f.id,
+      localId: f.id,
+      label: f.label,
+      type: f.type,
+      required: f.required,
+      placeholder: f.placeholder,
+      validation: f.validation as FieldValidation | null,
+      orderIndex: Number(f.orderIndex),
+    })));
     setHasDraft(false);
   }
 
-  // Auto-save draft to localStorage whenever state changes
   const saveDraft = useCallback(() => {
     if (!loadedFromServer.current) return;
     const draft: DraftState = { title, description, isOpenForSubmission, requiresAuth, secureCode, theme, fields };
     localStorage.setItem(getDraftKey(formId), JSON.stringify(draft));
   }, [title, description, isOpenForSubmission, requiresAuth, secureCode, theme, fields, formId]);
 
-  useEffect(() => {
-    saveDraft();
-  }, [saveDraft]);
+  useEffect(() => { saveDraft(); }, [saveDraft]);
 
-  // Dynamically compute hasDraft by comparing state with form from server
   useEffect(() => {
     if (!form || !loadedFromServer.current) return;
-
     const isModified =
       title !== form.title ||
-      description !== (form.description || "") ||
+      description !== (form.description || '') ||
       isOpenForSubmission !== form.isOpenForSubmission ||
       requiresAuth !== form.requiresAuth ||
       secureCode !== form.secureCode ||
-      JSON.stringify(theme) !== JSON.stringify(form.theme || {}) ||
+      JSON.stringify(theme) !== JSON.stringify(initializeTheme(form.theme)) ||
       fields.length !== form.fields.length ||
       fields.some((f) => {
         const sf = form.fields.find((s) => s.id === f.id);
-        if (!sf) return true; // new field added
+        if (!sf) return true;
         return (
           f.label !== sf.label ||
           f.type !== sf.type ||
@@ -252,7 +1192,6 @@ export default function FormBuilderPage() {
           JSON.stringify(f.validation || null) !== JSON.stringify(sf.validation || null)
         );
       });
-
     setHasDraft(isModified);
   }, [title, description, isOpenForSubmission, requiresAuth, secureCode, theme, fields, form]);
 
@@ -260,7 +1199,7 @@ export default function FormBuilderPage() {
     localStorage.removeItem(getDraftKey(formId));
     if (form) applyServerData(form);
     setHasDraft(false);
-    toast.success('Draft discarded — reverted to last saved version');
+    toast.success('Draft discarded — reverted to saved version');
   };
 
   const clearDraft = () => {
@@ -268,41 +1207,34 @@ export default function FormBuilderPage() {
     setHasDraft(false);
   };
 
-  // ─── TRPC Mutations ─────────────────────────────────────────
+  // ─── Mutations ──────────────────────────────────────────────
 
   const updateForm = trpc.form.updateForm.useMutation({
     onSuccess: (data) => {
       clearDraft();
-      toast.success('Changes saved');
+      toast.success('Changes saved ✓');
       if (data) {
         setTitle(data.title);
         setDescription(data.description || '');
         setIsOpenForSubmission(data.isOpenForSubmission);
         setRequiresAuth(data.requiresAuth);
         setSecureCode(data.secureCode);
-        setTheme((data.theme as Record<string, any>) || {});
-        const sorted = [...data.fields].sort(
-          (a, b) => Number(a.orderIndex) - Number(b.orderIndex)
-        );
-        setFields(
-          sorted.map((f) => ({
-            id: f.id,
-            localId: f.id,
-            label: f.label,
-            type: f.type,
-            required: f.required,
-            placeholder: f.placeholder,
-            validation: f.validation as FieldValidation | null,
-            orderIndex: Number(f.orderIndex),
-          }))
-        );
+        setTheme(initializeTheme(data.theme));
+        const sorted = [...data.fields].sort((a, b) => Number(a.orderIndex) - Number(b.orderIndex));
+        setFields(sorted.map((f) => ({
+          id: f.id,
+          localId: f.id,
+          label: f.label,
+          type: f.type,
+          required: f.required,
+          placeholder: f.placeholder,
+          validation: f.validation as FieldValidation | null,
+          orderIndex: Number(f.orderIndex),
+        })));
       }
-      setShowSettingsModal(false);
       utils.form.getFormById.invalidate({ id: formId });
     },
-    onError: (err) => {
-      toast.error(err.message || 'Failed to save');
-    }
+    onError: (err) => { toast.error(err.message || 'Failed to save'); },
   });
 
   const deleteForm = trpc.form.deleteForm.useMutation({
@@ -312,21 +1244,7 @@ export default function FormBuilderPage() {
       utils.form.getMyForms.invalidate();
       router.push('/dashboard');
     },
-    onError: (err) => {
-      toast.error(err.message || 'Failed to delete');
-    }
-  });
-
-  // ─── Helpers ─────────────────────────────────────────────────
-
-  const buildFieldPayload = (f: FormField, i: number) => ({
-    id: f.id,
-    label: f.label,
-    type: f.type as any,
-    required: f.required,
-    placeholder: f.placeholder || undefined,
-    validation: f.validation || undefined,
-    orderIndex: i * 10,
+    onError: (err) => { toast.error(err.message || 'Failed to delete'); },
   });
 
   const handleSave = () => {
@@ -334,11 +1252,19 @@ export default function FormBuilderPage() {
       id: formId,
       title,
       description: description || undefined,
-      isOpenForSubmission: isOpenForSubmission,
-      requiresAuth: requiresAuth,
-      secureCode: secureCode,
-      theme: theme,
-      fields: fields.map(buildFieldPayload),
+      isOpenForSubmission,
+      requiresAuth,
+      secureCode,
+      theme,
+      fields: fields.map((f, i) => ({
+        id: f.id,
+        label: f.label,
+        type: f.type as any,
+        required: f.required,
+        placeholder: f.placeholder || undefined,
+        validation: f.validation || undefined,
+        orderIndex: i * 10,
+      })),
     });
   };
 
@@ -359,49 +1285,36 @@ export default function FormBuilderPage() {
 
   const copyShareLink = () => {
     let url = `${window.location.origin}/forms/${formId}`;
-    if (form?.secureCode) url += `?code=${form.secureCode}`;
+    if (secureCode) url += `?code=${secureCode}`;
     navigator.clipboard.writeText(url);
     toast.success('Share link copied!');
   };
 
-  const addField = (type: string, afterIndex?: number) => {
+  const addField = (type: string) => {
     const defaultValidation: FieldValidation | null =
       type === 'single_select' || type === 'multi_select'
         ? { options: ['Option 1', 'Option 2'] }
-        : null;
-
-    let newOrderIndex: number;
-    if (afterIndex === undefined || fields.length === 0) {
-      newOrderIndex = fields.length > 0 ? Number(fields[fields.length - 1]!.orderIndex) + 1 : 0;
-    } else {
-      const current = Number(fields[afterIndex]!.orderIndex);
-      const next = afterIndex + 1 < fields.length ? Number(fields[afterIndex + 1]!.orderIndex) : current + 1;
-      newOrderIndex = (current + next) / 2;
-    }
+        : type === 'rating'
+          ? { min: 1, max: 5 }
+          : null;
 
     const newField: FormField = {
       localId: crypto.randomUUID(),
       label: 'New Question',
       type,
       required: false,
-      orderIndex: newOrderIndex,
+      orderIndex: fields.length > 0 ? Number(fields[fields.length - 1]!.orderIndex) + 10 : 0,
       validation: defaultValidation,
     };
-    const newFields = [...fields];
-    if (afterIndex === undefined) newFields.push(newField);
-    else newFields.splice(afterIndex + 1, 0, newField);
 
-    setFields(newFields);
-    setSelectedFieldIndex(afterIndex === undefined ? newFields.length - 1 : afterIndex + 1);
-    setActiveSidebarTab('question');
-    setShowMobileSidebar(true);
+    setFields((prev) => [...prev, newField]);
+    setExpandedFieldIdx(fields.length); // auto-expand new field
   };
 
-  const updateSelectedField = (updates: Partial<FormField>) => {
-    if (selectedFieldIndex === null) return;
+  const updateField = (idx: number, updates: Partial<FormField>) => {
     setFields((prev) => {
       const next = [...prev];
-      next[selectedFieldIndex] = { ...next[selectedFieldIndex]!, ...updates };
+      next[idx] = { ...next[idx]!, ...updates };
       return next;
     });
   };
@@ -409,1339 +1322,507 @@ export default function FormBuilderPage() {
   const removeField = (index: number, e: React.MouseEvent) => {
     e.stopPropagation();
     setFields((prev) => prev.filter((_, i) => i !== index));
-    if (selectedFieldIndex === index) setSelectedFieldIndex(null);
-    else if (selectedFieldIndex !== null && selectedFieldIndex > index)
-      setSelectedFieldIndex(selectedFieldIndex - 1);
+    if (expandedFieldIdx === index) setExpandedFieldIdx(null);
+    else if (expandedFieldIdx !== null && expandedFieldIdx > index)
+      setExpandedFieldIdx(expandedFieldIdx - 1);
   };
 
-  const handleReorder = (newFields: FormField[]) => {
-    setFields(newFields);
+  const navigateStep = (target: 1 | 2 | 3) => {
+    setStepDirection(target > currentStep ? 1 : -1);
+    setCurrentStep(target);
+    setExpandedFieldIdx(null);
   };
 
-  // ─── Render ─────────────────────────────────────────────────
+  const downloadQR = () => {
+    const svg = document.getElementById('builder-qr-code');
+    if (svg) {
+      const svgString = new XMLSerializer().serializeToString(svg);
+      const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(svgBlob);
+      const trigger = document.createElement('a');
+      trigger.href = url;
+      trigger.download = `${title.toLowerCase().replace(/\s+/g, '-')}-qr.svg`;
+      document.body.appendChild(trigger);
+      trigger.click();
+      document.body.removeChild(trigger);
+      URL.revokeObjectURL(url);
+      toast.success('QR Code downloaded!');
+    }
+  };
 
   if (isLoading || !form) {
     return (
-      <div className="flex items-center justify-center h-full">
+      <div className="flex items-center justify-center h-full min-h-screen">
         <div className="w-8 h-8 rounded-full border-2 border-inquest-accent border-t-transparent animate-spin" />
       </div>
     );
   }
 
-  const selectedField = selectedFieldIndex !== null ? fields[selectedFieldIndex] : null;
-  const responseCount = submissionCount?.count ?? 0;
-  const isPrivate = !!secureCode;
-
-  const canvasStyle: React.CSSProperties = {};
-  if (theme?.backgroundColor) {
-    canvasStyle.backgroundColor = theme.backgroundColor;
-  }
-  if (theme?.backgroundImageUrl) {
-    canvasStyle.backgroundImage = `url(${theme.backgroundImageUrl})`;
-    canvasStyle.backgroundSize = 'cover';
-    canvasStyle.backgroundPosition = 'center';
-  }
+  // ─── Render ─────────────────────────────────────────────────
 
   return (
-    <div className="h-[calc(100vh-60px)] md:h-[calc(100vh-96px)] flex flex-col -mx-6 -my-6 sm:-mx-8 sm:-my-8 md:-mx-12 md:-my-12 pt-16 md:pt-0 overflow-hidden bg-inquest-base">
-      {/* Header */}
-      <header className="bg-inquest-surface border-b border-inquest-rule p-4 sm:p-6 shrink-0 z-10 sticky top-0">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-          {/* Left: back + title */}
-          <div className="flex items-center gap-3 flex-1 min-w-0">
-            <button
-              onClick={() => router.push('/dashboard')}
-              className="p-2 hover:bg-inquest-depth rounded-full transition-colors text-inquest-ink-soft hover:text-inquest-ink shrink-0"
-            >
-              <ArrowLeft size={20} />
-            </button>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  className="text-xl sm:text-2xl font-serif font-bold text-inquest-ink bg-transparent border-0 focus:ring-0 p-0 w-full placeholder-inquest-ink-ghost"
-                  placeholder="Enquiry Title"
-                />
-                <div className="relative group shrink-0">
-                  <div className="w-5 h-5 rounded-full border border-inquest-rule flex items-center justify-center text-xs text-inquest-ink-soft cursor-help hover:bg-inquest-depth hover:text-inquest-ink transition-colors">
-                    ?
-                  </div>
-                  <div className="absolute top-full left-0 mt-2 w-64 p-3 bg-inquest-surface border border-inquest-rule rounded-xl shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 text-xs text-inquest-ink-mid">
-                    This is your enquiry title. It's the first thing respondents will see. The layout auto-saves your progress locally as a draft.
-                  </div>
-                </div>
-              </div>
-              <div 
-                onClick={() => setShowDescriptionModal(true)}
-                className="mt-1 cursor-pointer group flex items-start gap-2"
-              >
-                <p className={`text-sm ${description ? 'text-inquest-ink-mid' : 'text-inquest-ink-ghost italic'} line-clamp-2 flex-1`}>
-                  {description || 'Add an optional description...'}
-                </p>
-                <div className="opacity-0 group-hover:opacity-100 transition-opacity p-1 bg-inquest-depth rounded-md text-inquest-ink-soft mt-0.5">
-                  <Edit3 size={12} />
-                </div>
-              </div>
-            </div>
+    <div className="h-[calc(100vh-56px)] md:h-screen flex flex-col -mx-6 -my-6 sm:-mx-8 sm:-my-8 md:-mx-12 md:-my-12 pt-16 md:pt-0 overflow-hidden bg-transparent">
+
+      {/* ── Header bar ─────────────────────────────────────── */}
+      <header className="bg-inquest-surface/95 backdrop-blur-sm border-b border-inquest-rule p-4 sm:p-5 shrink-0 z-10 sticky top-0 flex items-center justify-between gap-3 shadow-xs">
+        <div className="flex items-center gap-3 min-w-0">
+          <button
+            onClick={() => router.push('/dashboard')}
+            className="p-2 hover:bg-inquest-depth rounded-full transition-colors text-inquest-ink-soft hover:text-inquest-ink shrink-0 cursor-pointer"
+            aria-label="Back to dashboard"
+          >
+            <ArrowLeft size={18} />
+          </button>
+          <div className="min-w-0">
+            <h1 className="text-lg sm:text-xl font-serif font-bold text-inquest-ink truncate leading-tight">
+              {title || 'Untitled Enquiry'}
+            </h1>
+            <p className="text-[10px] text-inquest-ink-ghost font-medium">
+              {currentStep === 1 ? '✏️ Building Fields' : currentStep === 2 ? '🎨 Designing Theme' : '🚀 Publishing'}
+            </p>
           </div>
+        </div>
 
-          {/* Right: actions */}
-          <div className="flex items-center gap-2 flex-wrap shrink-0">
-            {/* Dark Mode Toggle */}
-            <button
-              onClick={toggleDarkMode}
-              className="p-2 text-inquest-ink-soft hover:text-inquest-ink rounded-full transition-colors border border-inquest-rule/30 cursor-pointer"
-              title="Toggle theme mode"
-            >
-              {darkMode ? <Sun size={17} /> : <Moon size={17} />}
-            </button>
-
-            {/* Responses Button */}
-            <Link
-              href={`/dashboard/forms/${formId}/responses`}
-              className="flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-inquest-depth hover:bg-inquest-surface border border-inquest-rule text-sm font-medium text-inquest-ink transition-colors mr-2"
-            >
-              <Users size={14} className="text-inquest-accent" />
-              <span>Responses</span>
-              {submissionCount?.count !== undefined && submissionCount.count > 0 && (
-                <span className="bg-inquest-accent text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold ml-1">
-                  {submissionCount.count}
-                </span>
-              )}
-            </Link>
-
-            <button
-              onClick={copyShareLink}
-              className="flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-inquest-accent/10 hover:bg-inquest-accent/20 border border-inquest-accent/30 text-xs font-bold text-inquest-accent transition mr-2 cursor-pointer shadow-sm"
-              title="Copy share link"
-            >
-              <Copy size={13} />
-              <span>Copy Link</span>
-            </button>
-            {hasDraft ? (
-              <button
-                onClick={() => setShowSettingsModal(true)}
-                className="flex items-center gap-1.5 bg-inquest-accent text-white px-5 py-2 rounded-full font-medium hover:bg-inquest-accent-soft transition-colors terracotta-glow text-sm ml-1 cursor-pointer animate-pulse"
-              >
-                <Save size={15} />
-                <span>Save Changes</span>
-              </button>
-            ) : (
-              <div className="flex items-center gap-1 px-4 py-2 rounded-full bg-inquest-depth/50 text-inquest-ink-soft text-xs font-semibold select-none border border-inquest-rule/30">
-                <Check size={13} className="text-inquest-accent animate-bounce" />
-                <span>Saved to Cloud</span>
-              </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <NextLink
+            href={`/dashboard/forms/${formId}/responses`}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-inquest-depth hover:bg-inquest-surface border border-inquest-rule text-xs font-bold text-inquest-ink transition-colors"
+          >
+            <Users size={12} className="text-inquest-accent" />
+            <span className="hidden sm:inline">Responses</span>
+            {submissionCount?.count !== undefined && submissionCount.count > 0 && (
+              <span className="bg-inquest-accent text-white text-[9px] px-1.5 py-0.5 rounded-full font-extrabold">
+                {submissionCount.count}
+              </span>
             )}
-          </div>
+          </NextLink>
+
+          {hasDraft ? (
+            <button
+              onClick={handleSave}
+              disabled={updateForm.isPending}
+              className="flex items-center gap-1.5 bg-inquest-accent text-white px-4 py-1.5 rounded-xl font-bold hover:bg-inquest-accent-soft transition-colors terracotta-glow text-xs animate-pulse cursor-pointer shadow-xs"
+            >
+              <Save size={12} />
+              <span>{updateForm.isPending ? 'Saving…' : 'Save'}</span>
+            </button>
+          ) : (
+            <div className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-inquest-depth/50 text-inquest-ink-soft text-[10px] font-bold select-none border border-inquest-rule/30">
+              <Check size={11} className="text-inquest-accent" />
+              <span>Saved</span>
+            </div>
+          )}
         </div>
       </header>
 
-      {/* Delete Confirmation Modal */}
+      {/* ── Main content + DiarySpine ──────────────────────── */}
+      <div className="flex-1 flex flex-col overflow-hidden" style={{ perspective: '1200px' }}>
+
+        {/* Step content */}
+        <div className="flex-1 overflow-hidden relative">
+          <AnimatePresence initial={false} custom={stepDirection} mode="wait">
+            <motion.div
+              key={currentStep}
+              id={`step-panel-${currentStep}`}
+              role="tabpanel"
+              custom={stepDirection}
+              variants={pageFlipVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={{ type: 'spring', stiffness: 220, damping: 25, duration: 0.38 }}
+              style={{ perspective: '1200px' }}
+              className="absolute inset-0 flex flex-col overflow-hidden"
+            >
+
+              {/* ════════════ STEP 1: Build Canvas ════════════ */}
+              {currentStep === 1 && (
+                <div className="flex-1 overflow-y-auto p-6 sm:p-10 pb-12">
+                  <div className="max-w-full space-y-3">
+
+                    {/* Empty state */}
+                    {fields.length === 0 && !showAddStrip && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="text-center py-16 px-6 bg-inquest-surface border border-inquest-rule border-dashed rounded-[2.5rem]"
+                      >
+                        <Sparkles className="mx-auto h-10 w-10 text-inquest-accent mb-4" />
+                        <h3 className="text-2xl font-serif text-inquest-ink font-bold mb-1">Begin your enquiry.</h3>
+                        <p className="text-inquest-ink-mid text-sm max-w-xs mx-auto leading-relaxed mb-8">
+                          Every great form starts with a single question. Add your first field below.
+                        </p>
+                        <button
+                          onClick={() => setShowAddStrip(true)}
+                          className="inline-flex items-center gap-2 px-6 py-3 bg-inquest-accent text-white rounded-full font-bold terracotta-glow hover:bg-inquest-accent-soft transition-colors cursor-pointer text-sm"
+                        >
+                          <Plus size={16} /> Add First Question
+                        </button>
+                      </motion.div>
+                    )}
+
+                    {/* Field list */}
+                    <LayoutGroup>
+                      <Reorder.Group
+                        axis="y"
+                        values={fields}
+                        onReorder={setFields}
+                        className="space-y-3"
+                      >
+                        <AnimatePresence initial={false}>
+                          {fields.map((field, idx) => (
+                            <motion.div
+                              key={field.localId}
+                              initial={{ opacity: 0, y: 16, scale: 0.97 }}
+                              animate={{ opacity: 1, y: 0, scale: 1 }}
+                              exit={{ opacity: 0, y: -10, scale: 0.96 }}
+                              transition={{ type: 'spring', stiffness: 280, damping: 24 }}
+                              layout
+                            >
+                              <FieldCard
+                                field={field}
+                                idx={idx}
+                                isExpanded={expandedFieldIdx === idx}
+                                onToggleExpand={() => setExpandedFieldIdx(expandedFieldIdx === idx ? null : idx)}
+                                onUpdate={(updates) => updateField(idx, updates)}
+                                onRemove={removeField}
+                              />
+                            </motion.div>
+                          ))}
+                        </AnimatePresence>
+                      </Reorder.Group>
+                    </LayoutGroup>
+
+                    {/* Add field strip */}
+                    {(fields.length > 0 || showAddStrip) && (
+                      <AddFieldStrip
+                        onAdd={addField}
+                        isOpen={showAddStrip}
+                        onToggle={() => setShowAddStrip(!showAddStrip)}
+                      />
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* ════════════ STEP 2: Theme ════════════════════ */}
+              {currentStep === 2 && (
+                <div className="flex-1 flex flex-col overflow-hidden">
+                  {/* Form preview fills available space */}
+                  <div className="flex-1 overflow-y-auto relative">
+                    <div className="absolute top-3 right-4 z-10">
+                      <div className="flex items-center gap-1.5 px-3 py-1.5 bg-inquest-surface/90 backdrop-blur-sm rounded-full text-xs font-bold text-inquest-ink-soft border border-inquest-rule/50 shadow-sm">
+                        <Eye size={11} className="text-inquest-accent" />
+                        Live Preview
+                      </div>
+                    </div>
+                    <FormPreview
+                      fields={fields}
+                      title={title}
+                      description={description}
+                      theme={theme}
+                      mode={previewMode}
+                      interactive={false}
+                    />
+                  </div>
+
+                  {/* Theme panel — fixed to bottom of this step */}
+                  <ThemeControlPanel
+                    theme={theme}
+                    setTheme={setTheme}
+                    previewMode={previewMode}
+                    setPreviewMode={setPreviewMode}
+                  />
+                </div>
+              )}
+
+              {/* ════════════ STEP 3: Publish ══════════════════ */}
+              {currentStep === 3 && (
+                <div className="flex-1 overflow-y-auto p-6 sm:p-10 pb-12 bg-transparent">
+                  <div className="max-w-3xl mx-auto space-y-6">
+
+                    {/* Enquiry Identity */}
+                    <div className="bg-inquest-surface border border-inquest-rule rounded-[2rem] p-6 sm:p-8 space-y-5 warm-shadow">
+                      <h3 className="font-serif text-xl font-bold text-inquest-ink border-b border-inquest-rule/40 pb-3 flex items-center gap-2">
+                        <Edit3 size={18} className="text-inquest-accent" />
+                        Enquiry Identity
+                      </h3>
+                      <div>
+                        <label className="block text-xs font-bold text-inquest-ink-soft uppercase tracking-wider mb-1.5">Title</label>
+                        <input
+                          type="text"
+                          value={title}
+                          onChange={(e) => setTitle(e.target.value)}
+                          placeholder="Event registration, survey, etc."
+                          className="w-full bg-transparent border-0 border-b-2 border-inquest-rule focus:border-inquest-accent pb-1 text-lg font-serif font-bold text-inquest-ink focus:outline-none transition-colors"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-inquest-ink-soft uppercase tracking-wider mb-1.5">Description / Instructions</label>
+                        <textarea
+                          value={description}
+                          onChange={(e) => setDescription(e.target.value)}
+                          placeholder="Tell your respondents what this is about…"
+                          className="w-full bg-transparent border-0 border-b-2 border-inquest-rule/60 focus:border-inquest-accent text-sm text-inquest-ink h-24 resize-none leading-relaxed focus:outline-none transition-colors"
+                        />
+                      </div>
+                      {/* Mini stats */}
+                      <div className="flex gap-6 pt-2">
+                        <div className="text-center">
+                          <span className="text-2xl font-serif font-black text-inquest-ink">{fields.length}</span>
+                          <span className="text-[10px] text-inquest-ink-ghost block">Questions</span>
+                        </div>
+                        <div className="text-center">
+                          <span className="text-2xl font-serif font-black text-inquest-ink">{submissionCount?.count ?? 0}</span>
+                          <span className="text-[10px] text-inquest-ink-ghost block">Responses</span>
+                        </div>
+                        <div className="text-center">
+                          <span className="text-2xl font-serif font-black text-inquest-accent">{secureCode ? '🔒' : '🌐'}</span>
+                          <span className="text-[10px] text-inquest-ink-ghost block">{secureCode ? 'Private' : 'Public'}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Access Gates */}
+                    <div className="bg-inquest-surface border border-inquest-rule rounded-[2rem] p-6 sm:p-8 space-y-4 warm-shadow">
+                      <h3 className="font-serif text-xl font-bold text-inquest-ink border-b border-inquest-rule/40 pb-3 flex items-center gap-2">
+                        <Settings size={18} className="text-inquest-accent" />
+                        Access Gates
+                      </h3>
+
+                      {/* Accepting Responses */}
+                      <div className="flex items-center justify-between bg-inquest-base p-4 rounded-2xl border border-inquest-rule hover:-translate-y-0.5 hover:shadow-xs transition-all duration-200">
+                        <div>
+                          <span className="text-xs font-bold text-inquest-ink uppercase tracking-wider flex items-center gap-1.5">
+                            <Globe size={13} className={isOpenForSubmission ? 'text-inquest-accent' : 'text-inquest-ink-ghost'} />
+                            Accepting Responses
+                          </span>
+                          <span className="text-[10px] text-inquest-ink-soft mt-0.5 block">Toggle public submissions open or closed</span>
+                          {isOpenForSubmission ? (
+                            <span className="inline-flex items-center gap-1.5 text-[9px] font-extrabold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30 dark:text-emerald-400 px-2 py-0.5 rounded-full mt-1.5 select-none">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+                              Accepting Submissions
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 text-[9px] font-extrabold text-inquest-ink-ghost bg-inquest-depth/50 px-2 py-0.5 rounded-full mt-1.5 select-none">
+                              Submissions Closed
+                            </span>
+                          )}
+                        </div>
+                        <Switch checked={isOpenForSubmission} onCheckedChange={setIsOpenForSubmission} className="data-[state=checked]:bg-inquest-accent" />
+                      </div>
+
+                      {/* Require Login */}
+                      <div className="flex items-center justify-between bg-inquest-base p-4 rounded-2xl border border-inquest-rule hover:-translate-y-0.5 hover:shadow-xs transition-all duration-200">
+                        <div>
+                          <span className="text-xs font-bold text-inquest-ink uppercase tracking-wider flex items-center gap-1.5">
+                            <Users size={13} className={requiresAuth ? 'text-inquest-accent' : 'text-inquest-ink-ghost'} />
+                            Require User Login
+                          </span>
+                          <span className="text-[10px] text-inquest-ink-soft mt-0.5 block">Force respondents to sign in first</span>
+                          {requiresAuth ? (
+                            <span className="inline-flex items-center gap-1 text-[9px] font-extrabold text-inquest-accent bg-inquest-accent-pale px-2.5 py-0.5 rounded-full mt-1.5 select-none">
+                              Logged-in Users Only
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[9px] font-extrabold text-inquest-ink-ghost bg-inquest-depth/50 px-2.5 py-0.5 rounded-full mt-1.5 select-none">
+                              Open Access
+                            </span>
+                          )}
+                        </div>
+                        <Switch checked={requiresAuth} onCheckedChange={setRequiresAuth} className="data-[state=checked]:bg-inquest-accent" />
+                      </div>
+
+                      {/* Secure Code */}
+                      <div className="bg-inquest-base p-4 rounded-2xl border border-inquest-rule space-y-3 hover:-translate-y-0.5 hover:shadow-xs transition-all duration-200">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <span className="text-xs font-bold text-inquest-ink uppercase tracking-wider flex items-center gap-1.5">
+                              <Lock size={13} className={secureCode ? 'text-inquest-accent' : 'text-inquest-ink-ghost'} />
+                              Secure Code Gate
+                            </span>
+                            <span className="text-[10px] text-inquest-ink-soft mt-0.5 block">Lock form behind a private passcode</span>
+                            {secureCode ? (
+                              <span className="inline-flex items-center gap-1 text-[9px] font-extrabold text-amber-600 bg-amber-50 dark:bg-amber-950/30 dark:text-amber-400 px-2.5 py-0.5 rounded-full mt-1.5 select-none">
+                                Passcode Protected
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-[9px] font-extrabold text-inquest-ink-ghost bg-inquest-depth/50 px-2.5 py-0.5 rounded-full mt-1.5 select-none">
+                                No Passcode Required
+                              </span>
+                            )}
+                          </div>
+                          <Switch checked={!!secureCode} onCheckedChange={handleTogglePrivacy} className="data-[state=checked]:bg-inquest-accent" />
+                        </div>
+                        <AnimatePresence>
+                          {secureCode && (
+                            <motion.div
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: 'auto', opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              className="overflow-hidden"
+                            >
+                              <div className="flex items-center gap-2 pt-1">
+                                <div className="flex-1 bg-inquest-surface border border-inquest-rule rounded-xl px-4 py-2 font-mono text-base tracking-[0.4em] text-inquest-ink text-center select-all font-bold">
+                                  {secureCode}
+                                </div>
+                                <button type="button" onClick={copySecureCode} title="Copy code"
+                                  className="p-2.5 bg-inquest-depth hover:bg-inquest-rule rounded-xl transition-colors cursor-pointer">
+                                  <ClipboardCopy size={14} className="text-inquest-ink-soft" />
+                                </button>
+                                <button type="button" onClick={handleTogglePrivacy} title="Regenerate"
+                                  className="p-2.5 bg-inquest-depth hover:bg-inquest-rule rounded-xl transition-colors cursor-pointer">
+                                  <RotateCcw size={14} className="text-inquest-ink-soft" />
+                                </button>
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    </div>
+
+                    {/* Share & QR — Always Visible */}
+                    <div className="bg-inquest-surface border border-inquest-rule rounded-[2rem] p-6 sm:p-8 space-y-5 warm-shadow">
+                      <h3 className="font-serif text-xl font-bold text-inquest-ink border-b border-inquest-rule/40 pb-3 flex items-center gap-2">
+                        <Link size={18} className="text-inquest-accent" />
+                        Share & Access
+                      </h3>
+
+                      {/* URL bar */}
+                      <div className="bg-inquest-base p-3 rounded-xl border border-inquest-rule flex items-center gap-2">
+                        <input type="text" readOnly value={shareUrl}
+                          className="flex-1 bg-transparent text-xs font-mono text-inquest-ink select-all focus:outline-none truncate" />
+                        <button
+                          onClick={copyShareLink}
+                          className="shrink-0 px-3 py-1.5 bg-inquest-accent text-white rounded-lg text-xs font-bold hover:bg-inquest-accent-soft transition-colors cursor-pointer"
+                        >
+                          <Copy size={12} />
+                        </button>
+                      </div>
+
+                      {/* Action buttons + QR side by side */}
+                      <div className="flex flex-col sm:flex-row gap-5">
+                        {/* Action buttons */}
+                        <div className="flex-1 grid grid-cols-2 gap-3 content-start">
+                          <button
+                            id="copy-link-btn"
+                            onClick={copyShareLink}
+                            className="flex items-center justify-center gap-2 py-3 rounded-2xl bg-inquest-accent text-white font-bold text-sm hover:bg-inquest-accent-soft transition-colors terracotta-glow cursor-pointer"
+                          >
+                            <Copy size={14} /> Copy Link
+                          </button>
+                          <button
+                            id="preview-btn"
+                            onClick={() => window.open(`/forms/${formId}`, '_blank')}
+                            className="flex items-center justify-center gap-2 py-3 rounded-2xl bg-inquest-depth hover:bg-inquest-rule text-inquest-ink font-bold text-sm transition-colors cursor-pointer border border-inquest-rule"
+                          >
+                            <ExternalLink size={14} /> Preview
+                          </button>
+                          {secureCode && (
+                            <button
+                              id="copy-code-btn"
+                              onClick={copySecureCode}
+                              className="flex items-center justify-center gap-2 py-3 rounded-2xl bg-inquest-sage/15 hover:bg-inquest-sage/25 text-inquest-ink font-bold text-sm transition-colors cursor-pointer border border-inquest-sage/25"
+                            >
+                              <ClipboardCopy size={14} /> Copy Code
+                            </button>
+                          )}
+                        </div>
+
+                        {/* QR Code — always visible */}
+                        {shareUrl && (
+                          <div className="flex flex-col items-center gap-3 sm:border-l sm:border-inquest-rule/40 sm:pl-5">
+                            <div className="bg-white p-4 rounded-2xl border border-inquest-rule/40 shadow-inner">
+                              <QRCodeSVG id="builder-qr-code" value={shareUrl} size={140} fgColor="#3A2312" bgColor="#ffffff" level="H" />
+                            </div>
+                            <button onClick={downloadQR} className="text-xs text-inquest-accent font-bold hover:underline cursor-pointer flex items-center gap-1">
+                              <Download size={12} /> Download QR SVG
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Publish CTA */}
+                    <div className="space-y-3">
+                      <button
+                        onClick={handleSave}
+                        disabled={updateForm.isPending}
+                        className="w-full py-4 rounded-full bg-inquest-accent text-white font-bold hover:bg-inquest-accent-soft transition-colors terracotta-glow shadow-md flex items-center justify-center gap-2 cursor-pointer text-base"
+                      >
+                        <Save size={16} />
+                        {updateForm.isPending ? 'Saving…' : 'Save & Publish Enquiry'}
+                      </button>
+
+                      {hasDraft && (
+                        <button
+                          onClick={discardDraft}
+                          className="w-full py-3 rounded-full bg-inquest-surface text-inquest-ink border border-inquest-rule hover:bg-inquest-depth/40 transition-colors font-medium text-sm cursor-pointer"
+                        >
+                          Discard Local Draft
+                        </button>
+                      )}
+
+                      <div className="text-center pt-4">
+                        <button
+                          onClick={() => setShowDeleteConfirm(true)}
+                          className="text-xs font-bold text-inquest-ink-ghost hover:text-inquest-caution hover:underline transition-colors cursor-pointer"
+                        >
+                          ⚠ Delete this Enquiry
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          </AnimatePresence>
+        </div>
+
+        {/* DiarySpine — unified step navigation at bottom with Prev/Next */}
+        <div className="shrink-0 bg-inquest-surface/90 backdrop-blur-sm border-t border-inquest-rule py-2">
+          <DiarySpine currentStep={currentStep} onNavigate={navigateStep} />
+        </div>
+      </div>
+
+      {/* Delete Confirm Modal */}
       <AnimatePresence>
         {showDeleteConfirm && (
-          <motion.div
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4"
+          <div
+            className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
             onClick={() => setShowDeleteConfirm(false)}
           >
             <motion.div
-              initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-inquest-surface rounded-3xl p-8 max-w-sm w-full warm-shadow text-center"
+              className="bg-inquest-surface rounded-[2.5rem] p-8 max-w-sm w-full warm-shadow text-center border border-inquest-rule/45"
             >
               <div className="w-14 h-14 bg-inquest-caution/10 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Trash2 size={24} className="text-inquest-caution" />
               </div>
-              <h3 className="text-xl font-serif text-inquest-ink mb-2">Delete this Enquiry?</h3>
-              <p className="text-inquest-ink-mid text-sm mb-6">This will permanently remove &ldquo;{form.title}&rdquo; and all its responses.</p>
+              <h3 className="text-xl font-serif text-inquest-ink mb-2 font-bold">Delete this Enquiry?</h3>
+              <p className="text-inquest-ink-mid text-sm mb-6">This will permanently delete the form, all fields, and response records. Irreversible.</p>
               <div className="flex gap-3">
-                <button onClick={() => setShowDeleteConfirm(false)} className="flex-1 py-3 rounded-full border border-inquest-rule text-inquest-ink font-medium hover:bg-inquest-depth/30 transition-colors">
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="flex-1 py-3 rounded-full border border-inquest-rule text-inquest-ink font-medium hover:bg-inquest-depth/30 transition-colors cursor-pointer"
+                >
                   Cancel
                 </button>
                 <button
                   onClick={() => deleteForm.mutate({ id: formId })}
                   disabled={deleteForm.isPending}
-                  className="flex-1 py-3 rounded-full bg-inquest-caution text-white font-medium hover:opacity-90 transition-colors disabled:opacity-50"
+                  className="flex-1 py-3 rounded-full bg-inquest-caution text-white font-medium hover:opacity-90 transition-colors disabled:opacity-50 cursor-pointer"
                 >
-                  {deleteForm.isPending ? 'Deleting...' : 'Delete'}
+                  {deleteForm.isPending ? 'Deleting…' : 'Delete'}
                 </button>
               </div>
             </motion.div>
-          </motion.div>
+          </div>
         )}
       </AnimatePresence>
-
-      {/* Description Modal */}
-      <AnimatePresence>
-        {showDescriptionModal && (
-          <motion.div
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4"
-            onClick={() => setShowDescriptionModal(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
-              onClick={(e) => e.stopPropagation()}
-              className="bg-inquest-surface rounded-3xl p-6 md:p-8 max-w-2xl w-full warm-shadow"
-            >
-              <h3 className="text-xl font-serif text-inquest-ink mb-2">Edit Description</h3>
-              <p className="text-inquest-ink-mid text-sm mb-4">Add context or instructions for your respondents.</p>
-              
-              <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                className="w-full bg-inquest-base border border-inquest-rule focus:border-inquest-accent rounded-xl px-4 py-3 text-inquest-ink min-h-[150px] resize-y"
-                placeholder="Enter description..."
-                autoFocus
-              />
-              
-              <div className="flex gap-3 mt-6">
-                <button 
-                  onClick={() => setShowDescriptionModal(false)} 
-                  className="flex-1 py-3 rounded-full bg-inquest-accent text-white font-medium hover:bg-inquest-accent-soft transition-colors terracotta-glow"
-                >
-                  Done
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Save & Publish Confirmation Modal */}
-      <AnimatePresence>
-        {showSettingsModal && (
-          <motion.div
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
-            onClick={() => setShowSettingsModal(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
-              onClick={(e) => e.stopPropagation()}
-              className="bg-inquest-surface rounded-3xl p-6 md:p-8 max-w-md w-full warm-shadow relative border border-inquest-rule/40"
-            >
-              <button onClick={() => setShowSettingsModal(false)} className="absolute top-6 right-6 text-inquest-ink-ghost hover:text-inquest-ink text-lg font-bold transition">✕</button>
-              
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 bg-inquest-accent/10 rounded-full flex items-center justify-center">
-                  <Globe size={20} className="text-inquest-accent" />
-                </div>
-                <h3 className="text-2xl font-serif text-inquest-ink">Publish & Share</h3>
-              </div>
-
-              <p className="text-sm text-inquest-ink-mid leading-relaxed mb-6">
-                Review your changes and settings. Once confirmed, they will be live instantly.
-              </p>
-
-              <div className="space-y-4">
-                {/* Settings Modification Inputs inside Modal */}
-                <div className="space-y-4 max-h-[300px] overflow-y-auto pr-1">
-                  <div>
-                    <label className="block text-xs font-semibold text-inquest-ink-soft uppercase tracking-wider mb-1">Enquiry Title</label>
-                    <input
-                      type="text"
-                      value={title}
-                      onChange={(e) => setTitle(e.target.value)}
-                      className="w-full bg-inquest-base border border-inquest-rule focus:border-inquest-accent rounded-xl px-3 py-2 text-sm text-inquest-ink focus:ring-1 focus:ring-inquest-accent"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-inquest-ink-soft uppercase tracking-wider mb-1">Description (optional)</label>
-                    <textarea
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                      className="w-full bg-inquest-base border border-inquest-rule focus:border-inquest-accent rounded-xl px-3 py-2 text-sm text-inquest-ink h-16 resize-none focus:ring-1 focus:ring-inquest-accent"
-                    />
-                  </div>
-
-                  {/* Submission Toggle */}
-                  <div className="flex items-center justify-between bg-inquest-base p-3 rounded-xl border border-inquest-rule">
-                    <div className="flex flex-col">
-                      <span className="text-xs font-semibold text-inquest-ink">Accepting Responses</span>
-                      <span className="text-[10px] text-inquest-ink-soft">Allow public submissions</span>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={isOpenForSubmission}
-                      onChange={(e) => setIsOpenForSubmission(e.target.checked)}
-                      className="w-4 h-4 rounded border-inquest-rule text-inquest-accent focus:ring-inquest-accent cursor-pointer"
-                    />
-                  </div>
-
-                  {/* Requires Auth Toggle */}
-                  <div className="flex items-center justify-between bg-inquest-base p-3 rounded-xl border border-inquest-rule">
-                    <div className="flex flex-col">
-                      <span className="text-xs font-semibold text-inquest-ink">Require User Login</span>
-                      <span className="text-[10px] text-inquest-ink-soft">Respondents must authenticate</span>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={requiresAuth}
-                      onChange={(e) => setRequiresAuth(e.target.checked)}
-                      className="w-4 h-4 rounded border-inquest-rule text-inquest-accent focus:ring-inquest-accent cursor-pointer"
-                    />
-                  </div>
-
-                  {/* Passcode Gate Toggle */}
-                  <div className="bg-inquest-base p-3 rounded-xl border border-inquest-rule space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex flex-col">
-                        <span className="text-xs font-semibold text-inquest-ink">Require Secure Code</span>
-                        <span className="text-[10px] text-inquest-ink-soft">Protect form with a passcode</span>
-                      </div>
-                      <input
-                        type="checkbox"
-                        checked={isPrivate}
-                        onChange={handleTogglePrivacy}
-                        className="w-4 h-4 rounded border-inquest-rule text-inquest-accent focus:ring-inquest-accent cursor-pointer"
-                      />
-                    </div>
-                    {isPrivate && secureCode && (
-                      <div className="pt-1.5 flex items-center gap-2">
-                        <div className="flex-1 bg-inquest-surface border border-inquest-rule rounded-lg px-3 py-1.5 font-mono text-sm tracking-wider text-inquest-ink text-center select-all">
-                          {secureCode}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={copySecureCode}
-                          className="p-2 bg-inquest-depth hover:bg-inquest-rule text-inquest-ink-soft hover:text-inquest-ink rounded-lg transition-colors cursor-pointer"
-                          title="Copy code"
-                        >
-                          <ClipboardCopy size={13} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={handleTogglePrivacy}
-                          className="p-1.5 bg-inquest-depth hover:bg-inquest-rule text-[10px] font-semibold text-inquest-ink-mid rounded-lg transition-colors cursor-pointer"
-                        >
-                          Regen
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Highly Prominent Shareable Link */}
-                <div className="bg-inquest-base p-4 rounded-2xl border border-inquest-rule space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-xs font-bold text-inquest-ink-soft uppercase tracking-wider">Shareable Form Link</span>
-                    {isPrivate && <span className="text-[10px] text-inquest-caution bg-inquest-caution/10 px-2 py-0.5 rounded-full font-medium">Private Gate Active</span>}
-                  </div>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      readOnly
-                      value={shareUrl}
-                      className="flex-1 bg-inquest-surface border border-inquest-rule rounded-xl px-3 py-2 text-xs font-mono text-inquest-ink select-all focus:outline-none"
-                    />
-                    <button
-                      type="button"
-                      onClick={copyShareLink}
-                      className="px-4 py-2 bg-inquest-accent hover:bg-inquest-accent-soft text-white text-xs font-bold rounded-xl transition cursor-pointer shrink-0"
-                    >
-                      Copy Link
-                    </button>
-                  </div>
-                </div>
-
-                {/* QR Code sharing */}
-                {shareUrl && (
-                  <div className="bg-inquest-base p-4 rounded-2xl border border-inquest-rule flex flex-col items-center justify-center gap-3 text-center">
-                    <div className="w-full text-left">
-                      <span className="text-xs font-bold text-inquest-ink-soft uppercase tracking-wider block">QR Code</span>
-                      <span className="text-[10px] text-inquest-ink-mid">Scan to access this enquiry immediately.</span>
-                    </div>
-                    <div className="bg-white p-3 rounded-xl border border-inquest-rule/40 inline-flex flex-col items-center gap-2">
-                      <QRCodeSVG id="modal-qr-code" value={shareUrl} size={110} fgColor="#3E2723" bgColor="#ffffff" level="H" />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const svg = document.getElementById('modal-qr-code');
-                          if (svg) {
-                            const svgString = new XMLSerializer().serializeToString(svg);
-                            const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
-                            const url = URL.createObjectURL(svgBlob);
-                            const trigger = document.createElement('a');
-                            trigger.href = url;
-                            trigger.download = `${title.toLowerCase().replace(/\s+/g, '-')}-qr.svg`;
-                            document.body.appendChild(trigger);
-                            trigger.click();
-                            document.body.removeChild(trigger);
-                            URL.revokeObjectURL(url);
-                            toast.success('QR Code SVG downloaded!');
-                          }
-                        }}
-                        className="text-[10px] text-inquest-accent font-semibold hover:underline cursor-pointer"
-                      >
-                        Download SVG
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Bottom Actions */}
-              <div className="flex gap-3 pt-4 border-t border-inquest-rule mt-6">
-                <button
-                  type="button"
-                  onClick={() => setShowSettingsModal(false)}
-                  className="flex-1 py-2.5 rounded-full border border-inquest-rule text-inquest-ink font-medium hover:bg-inquest-depth/30 transition text-sm cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSave}
-                  disabled={updateForm.isPending}
-                  className="flex-1 py-2.5 rounded-full bg-inquest-accent text-white font-bold hover:bg-inquest-accent-soft transition-colors terracotta-glow disabled:opacity-50 cursor-pointer"
-                >
-                  {updateForm.isPending ? 'Publishing...' : 'Confirm & Save'}
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Main Workspace */}
-      <div className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
-        {/* Canvas */}
-        <div
-          style={canvasStyle}
-          className={`flex-1 overflow-y-auto p-6 sm:p-12 pb-32 transition-all duration-300 ${
-            !theme?.backgroundColor && !theme?.backgroundImageUrl ? 'bg-inquest-base' : ''
-          }`}
-        >
-          <div className="max-w-3xl mx-auto space-y-4">
-            <Reorder.Group axis="y" values={fields} onReorder={handleReorder} className="space-y-4">
-              <AnimatePresence>
-                {fields.map((field, idx) => (
-                  <Reorder.Item
-                    key={field.localId}
-                    value={field}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
-                    onClick={() => { setSelectedFieldIndex(idx); setActiveSidebarTab('question'); setShowMobileSidebar(true); }}
-                    className={`bg-inquest-surface p-5 sm:p-6 rounded-3xl cursor-pointer transition-all border group ${
-                      selectedFieldIndex === idx
-                        ? 'border-inquest-accent warm-shadow scale-[1.01]'
-                        : 'border-inquest-rule/50 hover:border-inquest-rule'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-start gap-3 flex-1 min-w-0">
-                        <div className="mt-1 cursor-grab active:cursor-grabbing text-inquest-ink-ghost hover:text-inquest-ink-soft transition-colors shrink-0">
-                          <GripVertical size={20} />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2 mb-1 flex-wrap">
-                            <span className="text-xs font-bold text-inquest-ink-soft uppercase tracking-wider">Q{idx + 1}</span>
-                            {field.required && (
-                              <span className="text-xs text-inquest-caution font-medium bg-inquest-caution/10 px-2 py-0.5 rounded-full">Required</span>
-                            )}
-                          </div>
-                          <h3 className="text-lg font-serif text-inquest-ink break-words">{field.label || 'Untitled'}</h3>
-                          <p className="text-inquest-ink-soft mt-0.5 italic text-xs">
-                            {FIELD_TYPES.find(t => t.type === field.type)?.label}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        <button onClick={(e) => removeField(idx, e)} className="p-2 text-inquest-ink-soft hover:text-inquest-caution hover:bg-red-50 rounded-full ml-1"><Trash2 size={16} /></button>
-                      </div>
-                    </div>
-                  </Reorder.Item>
-                ))}
-              </AnimatePresence>
-            </Reorder.Group>
-
-            {fields.length === 0 && (
-              <div className="text-center py-16 bg-inquest-surface border border-inquest-rule border-dashed rounded-3xl">
-                <p className="text-lg font-serif text-inquest-ink">Your canvas is empty.</p>
-                <p className="text-inquest-ink-mid mt-1 text-sm">Click the button below to add your first question.</p>
-              </div>
-            )}
-
-            <div className="pt-4 grid grid-cols-2 gap-3">
-              {FIELD_TYPES.map((type) => {
-                const Icon = type.icon;
-                return (
-                  <button
-                    key={type.type}
-                    onClick={() => addField(type.type)}
-                    className="flex items-center gap-3 p-4 bg-inquest-surface border border-inquest-rule rounded-2xl hover:border-inquest-accent hover:bg-inquest-depth/30 transition-all text-inquest-ink cursor-pointer"
-                  >
-                    <Icon size={18} className="text-inquest-ink-soft" />
-                    <span className="text-sm font-medium">{type.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Bottom Save changes trigger */}
-            {hasDraft && (
-              <div className="pt-8 flex justify-center">
-                <button
-                  onClick={() => setShowSettingsModal(true)}
-                  className="flex items-center justify-center gap-2 bg-inquest-accent text-white px-8 py-3.5 rounded-full font-semibold hover:bg-inquest-accent-soft transition-all terracotta-glow cursor-pointer text-base shadow-md w-full max-w-xs"
-                >
-                  <Save size={18} />
-                  Save Changes
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Desktop Sidebar */}
-        <div className="hidden md:flex w-80 bg-inquest-surface border-l border-inquest-rule flex-col overflow-y-auto z-10 shrink-0">
-          {/* Tabs header */}
-          <div className="flex border-b border-inquest-rule bg-inquest-base/30 shrink-0">
-            <button
-              onClick={() => setActiveSidebarTab('question')}
-              className={`flex-1 py-3 text-xs font-semibold uppercase tracking-wider text-center border-b-2 transition cursor-pointer ${
-                activeSidebarTab === 'question'
-                  ? 'border-inquest-accent text-inquest-accent font-bold'
-                  : 'border-transparent text-inquest-ink-soft hover:text-inquest-ink'
-              }`}
-            >
-              Question Config
-            </button>
-            <button
-              onClick={() => setActiveSidebarTab('settings')}
-              className={`flex-1 py-3 text-xs font-semibold uppercase tracking-wider text-center border-b-2 transition cursor-pointer ${
-                activeSidebarTab === 'settings'
-                  ? 'border-inquest-accent text-inquest-accent font-bold'
-                  : 'border-transparent text-inquest-ink-soft hover:text-inquest-ink'
-              }`}
-            >
-              Styles & Setup
-            </button>
-          </div>
-
-          <div className="flex-1 flex flex-col min-h-0">
-            {activeSidebarTab === 'question' ? (
-              selectedField ? (
-                <FieldConfigPanel
-                  field={selectedField}
-                  onUpdate={updateSelectedField}
-                  onDone={() => { setSelectedFieldIndex(null); setActiveSidebarTab('settings'); }}
-                  hasDraft={hasDraft}
-                  onSave={() => setShowSettingsModal(true)}
-                  isSaving={updateForm.isPending}
-                />
-              ) : (
-                <div className="flex-1 flex flex-col items-center justify-center p-6 text-center text-inquest-ink-ghost">
-                  <Settings size={32} className="mb-3 opacity-20" />
-                  <p className="text-sm font-medium">No question selected</p>
-                  <p className="text-xs mt-1">Select a question to configure its settings</p>
-                </div>
-              )
-            ) : (
-              <FormSettingsSidebarPanel
-                title={title} setTitle={setTitle}
-                description={description} setDescription={setDescription}
-                isOpenForSubmission={isOpenForSubmission} setIsOpenForSubmission={setIsOpenForSubmission}
-                requiresAuth={requiresAuth} setRequiresAuth={setRequiresAuth}
-                secureCode={secureCode} setSecureCode={setSecureCode}
-                theme={theme} setTheme={setTheme}
-                copySecureCode={copySecureCode}
-                isPrivate={isPrivate}
-                handleTogglePrivacy={handleTogglePrivacy}
-                deleteConfirmInput={deleteConfirmInput} setDeleteConfirmInput={setDeleteConfirmInput}
-                onDelete={() => deleteForm.mutate({ id: formId })}
-                isDeleting={deleteForm.isPending}
-                hasDraft={hasDraft}
-                onSave={() => setShowSettingsModal(true)}
-                isSaving={updateForm.isPending}
-                shareUrl={shareUrl}
-                copyShareLink={copyShareLink}
-              />
-            )}
-          </div>
-        </div>
-
-        {/* Mobile Sidebar Overlay */}
-        <AnimatePresence>
-          {showMobileSidebar && (
-            <motion.div
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="md:hidden fixed inset-0 bg-black/30 z-40"
-              onClick={() => setShowMobileSidebar(false)}
-            >
-              <motion.div
-                initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
-                transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-                onClick={(e) => e.stopPropagation()}
-                className="absolute right-0 top-0 bottom-0 w-80 max-w-[85vw] bg-inquest-surface shadow-xl flex flex-col"
-              >
-                {/* Tabs header */}
-                <div className="flex border-b border-inquest-rule bg-inquest-base/30 shrink-0">
-                  <button
-                    onClick={() => setActiveSidebarTab('question')}
-                    className={`flex-1 py-3 text-xs font-semibold uppercase tracking-wider text-center border-b-2 transition cursor-pointer ${
-                      activeSidebarTab === 'question'
-                        ? 'border-inquest-accent text-inquest-accent font-bold'
-                        : 'border-transparent text-inquest-ink-soft hover:text-inquest-ink'
-                    }`}
-                  >
-                    Question
-                  </button>
-                  <button
-                    onClick={() => setActiveSidebarTab('settings')}
-                    className={`flex-1 py-3 text-xs font-semibold uppercase tracking-wider text-center border-b-2 transition cursor-pointer ${
-                      activeSidebarTab === 'settings'
-                        ? 'border-inquest-accent text-inquest-accent font-bold'
-                        : 'border-transparent text-inquest-ink-soft hover:text-inquest-ink'
-                    }`}
-                  >
-                    Settings
-                  </button>
-                  <button onClick={() => setShowMobileSidebar(false)} className="px-3 text-inquest-ink-soft hover:text-inquest-ink border-l border-inquest-rule">✕</button>
-                </div>
-
-                <div className="flex-1 flex flex-col min-h-0">
-                  {activeSidebarTab === 'question' ? (
-                    selectedField ? (
-                      <FieldConfigPanel
-                        field={selectedField}
-                        onUpdate={updateSelectedField}
-                        onDone={() => { setSelectedFieldIndex(null); setShowMobileSidebar(false); }}
-                        hasDraft={hasDraft}
-                        onSave={() => setShowSettingsModal(true)}
-                        isSaving={updateForm.isPending}
-                      />
-                    ) : (
-                      <div className="flex-1 flex flex-col items-center justify-center p-6 text-center text-inquest-ink-ghost h-full mt-20">
-                        <Settings size={32} className="mb-3 opacity-20" />
-                        <p className="text-sm font-medium">No question selected</p>
-                      </div>
-                    )
-                  ) : (
-                    <FormSettingsSidebarPanel
-                      title={title} setTitle={setTitle}
-                      description={description} setDescription={setDescription}
-                      isOpenForSubmission={isOpenForSubmission} setIsOpenForSubmission={setIsOpenForSubmission}
-                      requiresAuth={requiresAuth} setRequiresAuth={setRequiresAuth}
-                      secureCode={secureCode} setSecureCode={setSecureCode}
-                      theme={theme} setTheme={setTheme}
-                      copySecureCode={copySecureCode}
-                      isPrivate={isPrivate}
-                      handleTogglePrivacy={handleTogglePrivacy}
-                      deleteConfirmInput={deleteConfirmInput} setDeleteConfirmInput={setDeleteConfirmInput}
-                      onDelete={() => deleteForm.mutate({ id: formId })}
-                      isDeleting={deleteForm.isPending}
-                      hasDraft={hasDraft}
-                      onSave={() => setShowSettingsModal(true)}
-                      isSaving={updateForm.isPending}
-                      shareUrl={shareUrl}
-                      copyShareLink={copyShareLink}
-                    />
-                  )}
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
     </div>
   );
 }
-
-// ─── Field Config Panel ───────────────────────────────────────
-
-function FieldConfigPanel({ field, onUpdate, onDone, hasDraft, onSave, isSaving }: {
-  field: FormField;
-  onUpdate: (updates: Partial<FormField>) => void;
-  onDone: () => void;
-  hasDraft?: boolean;
-  onSave?: () => void;
-  isSaving?: boolean;
-}) {
-  const v = field.validation || {};
-
-  const setValidation = (patch: Partial<FieldValidation>) => {
-    onUpdate({ validation: { ...v, ...patch } });
-  };
-
-  return (
-    <div className="p-6 space-y-5 flex flex-col h-full overflow-hidden bg-inquest-surface">
-      <div className="flex-1 overflow-y-auto space-y-5 pr-1 pb-4">
-      <div className="flex items-center justify-between">
-        <h3 className="font-serif text-lg text-inquest-ink flex items-center gap-2">
-          <Settings size={17} /> Configuration
-        </h3>
-        <button onClick={onDone} className="px-3 py-1.5 bg-inquest-depth text-inquest-ink text-xs font-medium rounded-full hover:bg-inquest-rule transition-colors">
-          Close Panel
-        </button>
-      </div>
-
-      {/* Field Type */}
-      <div>
-        <label className="block text-xs font-semibold text-inquest-ink-soft uppercase tracking-wider mb-1">Field Type</label>
-        <select
-          value={field.type}
-          onChange={(e) => {
-            const newType = e.target.value;
-            const newValidation = newType === 'single_select' || newType === 'multi_select' 
-              ? { options: ['Option 1', 'Option 2'] } 
-              : newType === 'rating'
-                ? { min: 1, max: 5 }
-                : null;
-            onUpdate({ type: newType, validation: newValidation });
-          }}
-          className="w-full bg-inquest-base border border-inquest-rule focus:border-inquest-accent rounded-xl px-3 py-2 text-inquest-ink text-sm"
-        >
-          {FIELD_TYPES.map(t => (
-            <option key={t.type} value={t.type}>{t.label}</option>
-          ))}
-        </select>
-      </div>
-
-      {/* Label */}
-      <div>
-        <label className="block text-xs font-semibold text-inquest-ink-soft uppercase tracking-wider mb-1">Question Label</label>
-        <input
-          type="text"
-          value={field.label}
-          onChange={(e) => onUpdate({ label: e.target.value })}
-          className="w-full bg-inquest-base border border-inquest-rule focus:border-inquest-accent rounded-xl px-3 py-2 text-inquest-ink focus:ring-1 focus:ring-inquest-accent text-sm"
-        />
-      </div>
-
-      {/* Placeholder */}
-      <div>
-        <label className="block text-xs font-semibold text-inquest-ink-soft uppercase tracking-wider mb-1">Placeholder</label>
-        <input
-          type="text"
-          value={field.placeholder || ''}
-          onChange={(e) => onUpdate({ placeholder: e.target.value })}
-          className="w-full bg-inquest-base border border-inquest-rule focus:border-inquest-accent rounded-xl px-3 py-2 text-inquest-ink focus:ring-1 focus:ring-inquest-accent text-sm"
-        />
-      </div>
-
-      {/* Required */}
-      <div className="flex items-center justify-between bg-inquest-base p-3 rounded-xl border border-inquest-rule">
-        <label className="text-sm font-medium text-inquest-ink-mid">Required</label>
-        <input
-          type="checkbox"
-          checked={field.required}
-          onChange={(e) => onUpdate({ required: e.target.checked })}
-          className="w-4 h-4 rounded border-inquest-rule text-inquest-accent focus:ring-inquest-accent"
-        />
-      </div>
-
-      {/* ── Type-specific validation ── */}
-      <div className="pt-3 border-t border-inquest-rule">
-        <p className="text-xs font-semibold text-inquest-ink-soft uppercase tracking-wider mb-3">Validation Rules</p>
-
-        {/* TEXT / TEXTAREA */}
-        {(field.type === 'text' || field.type === 'textarea') && (
-          <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="block text-xs text-inquest-ink-soft mb-1">Min Length</label>
-                <input type="number" min={0} value={v.minLength ?? ''} onChange={(e) => setValidation({ minLength: e.target.value ? Number(e.target.value) : undefined })}
-                  className="w-full bg-inquest-base border border-inquest-rule rounded-lg px-2 py-1.5 text-sm text-inquest-ink" placeholder="0" />
-              </div>
-              <div>
-                <label className="block text-xs text-inquest-ink-soft mb-1">Max Length</label>
-                <input type="number" min={0} value={v.maxLength ?? ''} onChange={(e) => setValidation({ maxLength: e.target.value ? Number(e.target.value) : undefined })}
-                  className="w-full bg-inquest-base border border-inquest-rule rounded-lg px-2 py-1.5 text-sm text-inquest-ink" placeholder="∞" />
-              </div>
-            </div>
-            <div>
-              <label className="block text-xs text-inquest-ink-soft mb-1">Regex Pattern</label>
-              <input type="text" value={v.pattern ?? ''} onChange={(e) => setValidation({ pattern: e.target.value || undefined })}
-                className="w-full bg-inquest-base border border-inquest-rule rounded-lg px-2 py-1.5 text-sm font-mono text-inquest-ink" placeholder="e.g. ^[A-Z]+" />
-            </div>
-          </div>
-        )}
-
-        {/* NUMBER */}
-        {field.type === 'number' && (
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="block text-xs text-inquest-ink-soft mb-1">Min Value</label>
-              <input type="number" value={v.min ?? ''} onChange={(e) => setValidation({ min: e.target.value ? Number(e.target.value) : undefined })}
-                className="w-full bg-inquest-base border border-inquest-rule rounded-lg px-2 py-1.5 text-sm text-inquest-ink" placeholder="None" />
-            </div>
-            <div>
-              <label className="block text-xs text-inquest-ink-soft mb-1">Max Value</label>
-              <input type="number" value={v.max ?? ''} onChange={(e) => setValidation({ max: e.target.value ? Number(e.target.value) : undefined })}
-                className="w-full bg-inquest-base border border-inquest-rule rounded-lg px-2 py-1.5 text-sm text-inquest-ink" placeholder="None" />
-            </div>
-          </div>
-        )}
-
-        {/* DATE */}
-        {field.type === 'date' && (
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="block text-xs text-inquest-ink-soft mb-1">Earliest Date</label>
-              <input type="date" value={v.minDate ?? ''} onChange={(e) => setValidation({ minDate: e.target.value || undefined })}
-                className="w-full bg-inquest-base border border-inquest-rule rounded-lg px-2 py-1.5 text-sm text-inquest-ink" />
-            </div>
-            <div>
-              <label className="block text-xs text-inquest-ink-soft mb-1">Latest Date</label>
-              <input type="date" value={v.maxDate ?? ''} onChange={(e) => setValidation({ maxDate: e.target.value || undefined })}
-                className="w-full bg-inquest-base border border-inquest-rule rounded-lg px-2 py-1.5 text-sm text-inquest-ink" />
-            </div>
-          </div>
-        )}
-
-        {/* PHONE */}
-        {field.type === 'phone' && (
-          <div className="space-y-3">
-            <div>
-              <label className="block text-xs text-inquest-ink-soft mb-1">Country Code</label>
-              <select
-                value={v.countryCode ?? ''}
-                onChange={(e) => setValidation({ countryCode: e.target.value || undefined })}
-                className="w-full bg-inquest-base border border-inquest-rule rounded-lg px-2 py-1.5 text-sm text-inquest-ink"
-              >
-                {COUNTRY_CODES.map((c) => (
-                  <option key={c.value} value={c.value}>{c.label}</option>
-                ))}
-              </select>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="block text-xs text-inquest-ink-soft mb-1">Min Digits</label>
-                <input type="number" min={0} value={v.minLength ?? ''} onChange={(e) => setValidation({ minLength: e.target.value ? Number(e.target.value) : undefined })}
-                  className="w-full bg-inquest-base border border-inquest-rule rounded-lg px-2 py-1.5 text-sm text-inquest-ink" placeholder="0" />
-              </div>
-              <div>
-                <label className="block text-xs text-inquest-ink-soft mb-1">Max Digits</label>
-                <input type="number" min={0} value={v.maxLength ?? ''} onChange={(e) => setValidation({ maxLength: e.target.value ? Number(e.target.value) : undefined })}
-                  className="w-full bg-inquest-base border border-inquest-rule rounded-lg px-2 py-1.5 text-sm text-inquest-ink" placeholder="∞" />
-              </div>
-            </div>
-            <div>
-              <label className="block text-xs text-inquest-ink-soft mb-1">Pattern (optional)</label>
-              <input type="text" value={v.pattern ?? ''} onChange={(e) => setValidation({ pattern: e.target.value || undefined })}
-                className="w-full bg-inquest-base border border-inquest-rule rounded-lg px-2 py-1.5 text-sm font-mono text-inquest-ink" placeholder="e.g. ^\+?[0-9]+" />
-            </div>
-          </div>
-        )}
-
-        {/* EMAIL — no extra config */}
-        {field.type === 'email' && (
-          <p className="text-xs text-inquest-ink-ghost italic">Email format is automatically validated.</p>
-        )}
-
-        {/* BOOLEAN — no config */}
-        {field.type === 'boolean' && (
-          <p className="text-xs text-inquest-ink-ghost italic">Yes/No fields have no additional validation.</p>
-        )}
-
-        {/* RATING */}
-        {field.type === 'rating' && (
-          <div className="space-y-3">
-            <div>
-              <label className="block text-xs text-inquest-ink-soft mb-1 font-bold">Max Rating Stars</label>
-              <input
-                type="number" min={1} max={10}
-                value={v.max ?? 5}
-                onChange={(e) => setValidation({ max: e.target.value ? Number(e.target.value) : 5 })}
-                className="w-full bg-inquest-base border border-inquest-rule rounded-lg px-2 py-1.5 text-sm text-inquest-ink"
-              />
-              <p className="text-[10px] text-inquest-ink-ghost mt-1">Choose between 1 and 10 stars (default: 5).</p>
-            </div>
-          </div>
-        )}
-
-        {/* SINGLE SELECT */}
-        {field.type === 'single_select' && (
-          <div className="space-y-2">
-            <label className="block text-xs text-inquest-ink-soft mb-1">Options</label>
-            {(v.options || []).map((opt: string, i: number) => (
-              <div key={i} className="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={opt}
-                  onChange={(e) => {
-                    const opts = [...(v.options || [])];
-                    opts[i] = e.target.value;
-                    setValidation({ options: opts });
-                  }}
-                  className="flex-1 bg-inquest-base border border-inquest-rule rounded-lg px-2 py-1.5 text-sm"
-                />
-                <button
-                  onClick={() => setValidation({ options: (v.options || []).filter((_: any, j: number) => j !== i) })}
-                  className="p-1 text-inquest-ink-soft hover:text-inquest-caution"
-                >
-                  <Trash2 size={13} />
-                </button>
-              </div>
-            ))}
-            <button
-              onClick={() => setValidation({ options: [...(v.options || []), `Option ${(v.options?.length || 0) + 1}`] })}
-              className="text-xs text-inquest-accent font-medium hover:underline mt-1"
-            >
-              + Add Option
-            </button>
-          </div>
-        )}
-
-        {/* MULTI SELECT */}
-        {field.type === 'multi_select' && (
-          <div className="space-y-3">
-            <div className="space-y-2">
-              <label className="block text-xs text-inquest-ink-soft mb-1">Options</label>
-              {(v.options || []).map((opt: string, i: number) => (
-                <div key={i} className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={opt}
-                    onChange={(e) => {
-                      const opts = [...(v.options || [])];
-                      opts[i] = e.target.value;
-                      setValidation({ options: opts });
-                    }}
-                    className="flex-1 bg-inquest-base border border-inquest-rule rounded-lg px-2 py-1.5 text-sm"
-                  />
-                  <button
-                    onClick={() => setValidation({ options: (v.options || []).filter((_: any, j: number) => j !== i) })}
-                    className="p-1 text-inquest-ink-soft hover:text-inquest-caution"
-                  >
-                    <Trash2 size={13} />
-                  </button>
-                </div>
-              ))}
-              <button
-                onClick={() => setValidation({ options: [...(v.options || []), `Option ${(v.options?.length || 0) + 1}`] })}
-                className="text-xs text-inquest-accent font-medium hover:underline mt-1"
-              >
-                + Add Option
-              </button>
-            </div>
-            <div>
-              <label className="block text-xs text-inquest-ink-soft mb-1">Max Selections (optional)</label>
-              <input
-                type="number" min={1}
-                value={v.maxSelections ?? ''}
-                onChange={(e) => setValidation({ maxSelections: e.target.value ? Number(e.target.value) : undefined })}
-                className="w-full bg-inquest-base border border-inquest-rule rounded-lg px-2 py-1.5 text-sm"
-                placeholder="Unlimited"
-              />
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-
-      {hasDraft && onSave && (
-        <div className="pt-4 border-t border-inquest-rule shrink-0">
-          <button
-            type="button"
-            onClick={onSave}
-            disabled={isSaving}
-            className="w-full py-3 rounded-full bg-inquest-accent text-white font-bold transition flex items-center justify-center gap-2 terracotta-glow cursor-pointer text-xs animate-pulse"
-          >
-            <Save size={14} /> Save Changes
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── Preset Themes ──────────────────────────────────────────
-
-const PRESET_THEMES = [
-  {
-    name: 'Warm Parchment',
-    description: 'Cream light style',
-    backgroundColor: '#F5EFEB',
-    mode: 'light',
-    accentColor: '#D97436',
-  },
-  {
-    name: 'Midnight Studio',
-    description: 'Pitch black & orange glow',
-    backgroundColor: '#0B0705',
-    mode: 'dark',
-    accentColor: '#E06F28',
-  },
-  {
-    name: 'Aesthetic Sunset',
-    description: 'Dreamy peach vibe',
-    backgroundColor: '#FDE8E0',
-    mode: 'light',
-    accentColor: '#E0533C',
-  }
-];
-
-interface FormSettingsSidebarPanelProps {
-  title: string;
-  setTitle: (t: string) => void;
-  description: string;
-  setDescription: (d: string) => void;
-  isOpenForSubmission: boolean;
-  setIsOpenForSubmission: (o: boolean) => void;
-  requiresAuth: boolean;
-  setRequiresAuth: (a: boolean) => void;
-  secureCode: string | null;
-  setSecureCode: (c: string | null) => void;
-  theme: Record<string, any>;
-  setTheme: React.Dispatch<React.SetStateAction<Record<string, any>>>;
-  copySecureCode: () => void;
-  isPrivate: boolean;
-  handleTogglePrivacy: () => void;
-  deleteConfirmInput: string;
-  setDeleteConfirmInput: (val: string) => void;
-  onDelete: () => void;
-  isDeleting: boolean;
-  hasDraft?: boolean;
-  onSave: () => void;
-  isSaving?: boolean;
-  shareUrl: string;
-  copyShareLink: () => void;
-}
-
-function FormSettingsSidebarPanel({
-  title, setTitle,
-  description, setDescription,
-  isOpenForSubmission, setIsOpenForSubmission,
-  requiresAuth, setRequiresAuth,
-  secureCode, setSecureCode,
-  theme, setTheme,
-  copySecureCode,
-  isPrivate,
-  handleTogglePrivacy,
-  deleteConfirmInput, setDeleteConfirmInput,
-  onDelete,
-  isDeleting,
-  hasDraft,
-  onSave,
-  isSaving,
-  shareUrl,
-  copyShareLink,
-}: FormSettingsSidebarPanelProps) {
-  const currentTheme = theme || {};
-
-  return (
-    <div className="p-6 space-y-6 flex flex-col h-full overflow-hidden bg-inquest-surface">
-      <div className="flex-1 overflow-y-auto space-y-6 pr-1 pb-4">
-        
-        {/* Large Highly Obvious Copy Link Section */}
-        <div className="bg-inquest-base border border-inquest-rule rounded-2xl p-4 space-y-3 warm-shadow">
-          <div className="flex items-center gap-2 text-inquest-ink">
-            <Globe size={18} className="text-inquest-accent" />
-            <h4 className="text-sm font-serif font-bold">Enquiry Access & Sharing</h4>
-          </div>
-          <p className="text-xs text-inquest-ink-mid">
-            Distribute this link to collect responses. Anyone with the link (and secure code, if active) can fill out the form.
-          </p>
-          <div className="space-y-2">
-            <input
-              type="text"
-              readOnly
-              value={shareUrl}
-              onClick={(e) => (e.target as HTMLInputElement).select()}
-              className="w-full bg-inquest-surface border border-inquest-rule rounded-xl px-3 py-2 text-xs font-mono text-inquest-ink select-all focus:outline-none"
-            />
-            <button
-              type="button"
-              onClick={copyShareLink}
-              className="w-full py-3 bg-inquest-accent hover:bg-inquest-accent-soft text-white text-sm font-bold rounded-full transition-all terracotta-glow cursor-pointer flex items-center justify-center gap-2"
-            >
-              <Copy size={16} />
-              Copy Shareable Link
-            </button>
-          </div>
-        </div>
-
-        {/* Info Setup */}
-        <div className="space-y-3">
-          <h4 className="text-xs font-semibold text-inquest-ink-soft uppercase tracking-wider">Enquiry Details</h4>
-          <div>
-            <label className="block text-xs text-inquest-ink-mid mb-1">Title</label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="w-full bg-inquest-base border border-inquest-rule focus:border-inquest-accent rounded-xl px-3 py-2 text-inquest-ink text-sm"
-              placeholder="e.g. Customer Survey"
-            />
-          </div>
-          <div>
-            <label className="block text-xs text-inquest-ink-mid mb-1">Description (optional)</label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="w-full bg-inquest-base border border-inquest-rule focus:border-inquest-accent rounded-xl px-3 py-2 text-inquest-ink text-sm h-20 resize-none"
-              placeholder="Provide context or instructions..."
-            />
-          </div>
-        </div>
-
-        {/* Privacy & Validation */}
-        <div className="space-y-3">
-          <h4 className="text-xs font-semibold text-inquest-ink-soft uppercase tracking-wider">Security & Submissions</h4>
-          
-          <div className="flex items-center justify-between bg-inquest-base p-3 rounded-xl border border-inquest-rule">
-            <div className="flex flex-col">
-              <span className="text-sm font-medium text-inquest-ink-mid">Accepting Responses</span>
-              <span className="text-[10px] text-inquest-ink-soft">Allow public submissions</span>
-            </div>
-            <input
-              type="checkbox"
-              checked={isOpenForSubmission}
-              onChange={(e) => setIsOpenForSubmission(e.target.checked)}
-              className="w-4 h-4 rounded border-inquest-rule text-inquest-accent focus:ring-inquest-accent cursor-pointer"
-            />
-          </div>
-
-          <div className="flex items-center justify-between bg-inquest-base p-3 rounded-xl border border-inquest-rule">
-            <div className="flex flex-col">
-              <span className="text-sm font-medium text-inquest-ink-mid">Require Login</span>
-              <span className="text-[10px] text-inquest-ink-soft">Respondents must authenticate</span>
-            </div>
-            <input
-              type="checkbox"
-              checked={requiresAuth}
-              onChange={(e) => setRequiresAuth(e.target.checked)}
-              className="w-4 h-4 rounded border-inquest-rule text-inquest-accent focus:ring-inquest-accent cursor-pointer"
-            />
-          </div>
-
-          {/* Secure Gate (Privacy) */}
-          <div className="bg-inquest-base p-3 rounded-xl border border-inquest-rule space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex flex-col">
-                <span className="text-sm font-medium text-inquest-ink-mid">Require Secure Code</span>
-                <span className="text-[10px] text-inquest-ink-soft">Protect form with a passcode</span>
-              </div>
-              <input
-                type="checkbox"
-                checked={isPrivate}
-                onChange={handleTogglePrivacy}
-                className="w-4 h-4 rounded border-inquest-rule text-inquest-accent focus:ring-inquest-accent cursor-pointer"
-              />
-            </div>
-            {isPrivate && secureCode && (
-              <div className="pt-2 flex items-center gap-2">
-                <div className="flex-1 bg-inquest-surface border border-inquest-rule rounded-lg px-3 py-1.5 font-mono text-sm tracking-wider text-inquest-ink text-center select-all">
-                  {secureCode}
-                </div>
-                <button
-                  type="button"
-                  onClick={copySecureCode}
-                  className="p-2 bg-inquest-depth hover:bg-inquest-rule text-inquest-ink-soft hover:text-inquest-ink rounded-lg transition-colors cursor-pointer"
-                  title="Copy code"
-                >
-                  <ClipboardCopy size={14} />
-                </button>
-                <button
-                  type="button"
-                  onClick={handleTogglePrivacy}
-                  className="p-1.5 bg-inquest-depth hover:bg-inquest-rule text-xs font-semibold text-inquest-ink-mid rounded-lg transition-colors cursor-pointer"
-                >
-                  Regen
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Theme Designer */}
-        <div className="space-y-4">
-          <div className="flex items-center gap-2">
-            <Palette size={16} className="text-inquest-accent" />
-            <h4 className="text-xs font-semibold text-inquest-ink-soft uppercase tracking-wider">Theme Designer</h4>
-          </div>
-
-          {/* Real-time Miniature Form Preview */}
-          <div className="border border-inquest-rule rounded-2xl p-4 relative overflow-hidden"
-            style={{
-              backgroundColor: currentTheme.backgroundColor || '#F5EFEB',
-              backgroundImage: currentTheme.backgroundImageUrl ? `url(${currentTheme.backgroundImageUrl})` : undefined,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-              minHeight: '120px'
-            }}
-          >
-            {/* Visual preview card */}
-            <div className={`p-3 rounded-xl border border-white/20 backdrop-blur-sm shadow-sm ${currentTheme.mode === 'dark' ? 'bg-black/60 text-white' : 'bg-white/80 text-gray-900'}`}>
-              <div className="h-2 w-12 rounded-full mb-2" style={{ backgroundColor: currentTheme.accentColor || '#E06F28' }} />
-              <div className="text-[10px] font-bold truncate">{title || 'Untitled Enquiry'}</div>
-              <div className="text-[8px] opacity-60 truncate mt-0.5">{description || 'No description provided'}</div>
-              <div className="mt-3 flex justify-between items-center">
-                <div className="h-4 w-12 rounded-lg bg-gray-200 dark:bg-gray-700" />
-                <div className="h-4 w-10 rounded-full text-[8px] font-bold text-white flex items-center justify-center animate-pulse" style={{ backgroundColor: currentTheme.accentColor || '#E06F28' }}>
-                  Submit
-                </div>
-              </div>
-            </div>
-            <div className="absolute bottom-2 right-2 text-[9px] font-mono bg-black/65 text-white/95 px-2 py-0.5 rounded-full select-none">
-              {currentTheme.mode === 'dark' ? 'Void Dark' : 'Cream Light'}
-            </div>
-          </div>
-
-          {/* Preset Grid */}
-          <div className="grid grid-cols-3 gap-2">
-            {PRESET_THEMES.map((preset) => {
-              const isActive = currentTheme.backgroundColor === preset.backgroundColor && currentTheme.mode === preset.mode;
-              return (
-                <button
-                  key={preset.name}
-                  type="button"
-                  onClick={() => setTheme({
-                    backgroundColor: preset.backgroundColor,
-                    mode: preset.mode as 'light' | 'dark',
-                    accentColor: preset.accentColor,
-                    backgroundImageUrl: ''
-                  })}
-                  className={`flex flex-col items-center justify-center p-2 rounded-xl border transition-all text-center cursor-pointer ${
-                    isActive
-                      ? 'border-inquest-accent bg-inquest-depth/50 scale-[1.03] ring-1 ring-inquest-accent'
-                      : 'border-inquest-rule bg-inquest-surface hover:border-inquest-ink-soft hover:bg-inquest-base/20'
-                  }`}
-                >
-                  <div className="w-5 h-5 rounded-full border border-inquest-rule flex items-center justify-center"
-                    style={{ backgroundColor: preset.backgroundColor }}
-                  >
-                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: preset.accentColor }} />
-                  </div>
-                  <span className="text-[9px] font-bold mt-1 text-inquest-ink leading-tight truncate w-full">{preset.name}</span>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Custom Theme Inputs */}
-          <div className="space-y-3 pt-2">
-            <div>
-              <label className="block text-xs text-inquest-ink-mid mb-1">Custom Background Color (Hex)</label>
-              <div className="flex gap-2">
-                <input
-                  type="color"
-                  value={currentTheme.backgroundColor?.startsWith('#') && currentTheme.backgroundColor?.length === 7 ? currentTheme.backgroundColor : '#F5EFEB'}
-                  onChange={(e) => setTheme((prev) => ({ ...prev, backgroundColor: e.target.value }))}
-                  className="w-10 h-9 rounded-xl border border-inquest-rule bg-inquest-base p-1 cursor-pointer"
-                />
-                <input
-                  type="text"
-                  value={currentTheme.backgroundColor || ''}
-                  onChange={(e) => setTheme((prev) => ({ ...prev, backgroundColor: e.target.value }))}
-                  className="flex-1 bg-inquest-base border border-inquest-rule rounded-xl px-3 py-1.5 text-xs text-inquest-ink font-mono"
-                  placeholder="#F5EFEB"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs text-inquest-ink-mid mb-1">Custom Background Image URL</label>
-              <input
-                type="text"
-                value={currentTheme.backgroundImageUrl || ''}
-                onChange={(e) => setTheme((prev) => ({ ...prev, backgroundImageUrl: e.target.value }))}
-                className="w-full bg-inquest-base border border-inquest-rule rounded-xl px-3 py-2 text-xs text-inquest-ink"
-                placeholder="https://images.unsplash.com/... or google image address"
-              />
-              
-              {/* Image URL copy instructions */}
-              <div className="mt-2 bg-inquest-depth/40 rounded-xl p-3 border border-inquest-rule text-[10px] text-inquest-ink-soft leading-relaxed space-y-1">
-                <div className="font-semibold text-inquest-ink flex items-center gap-1">
-                  <HelpCircle size={10} /> Google Image Search Guide:
-                </div>
-                <div>1. Search Google Images for a background theme.</div>
-                <div>2. Right-click target image, click <span className="font-bold text-inquest-accent">"Copy Image Address"</span>.</div>
-                <div>3. Paste link directly in the URL input field above.</div>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between pt-1">
-              <span className="text-xs text-inquest-ink-mid">Theme Accent Color</span>
-              <input
-                type="color"
-                value={currentTheme.accentColor || '#E06F28'}
-                onChange={(e) => setTheme((prev) => ({ ...prev, accentColor: e.target.value }))}
-                className="w-10 h-8 rounded-xl border border-inquest-rule bg-inquest-base p-1 cursor-pointer"
-              />
-            </div>
-
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-inquest-ink-mid">Mode (Contrast Casing)</span>
-              <div className="flex bg-inquest-base border border-inquest-rule rounded-lg p-0.5">
-                <button
-                  type="button"
-                  onClick={() => setTheme((prev) => ({ ...prev, mode: 'light' }))}
-                  className={`px-3 py-1 rounded-md text-[10px] font-bold flex items-center gap-1 cursor-pointer ${
-                    currentTheme.mode === 'light' || !currentTheme.mode
-                      ? 'bg-inquest-surface text-inquest-accent shadow-sm border border-inquest-rule/40'
-                      : 'text-inquest-ink-soft hover:text-inquest-ink'
-                  }`}
-                >
-                  <Sun size={10} /> Light
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setTheme((prev) => ({ ...prev, mode: 'dark' }))}
-                  className={`px-3 py-1 rounded-md text-[10px] font-bold flex items-center gap-1 cursor-pointer ${
-                    currentTheme.mode === 'dark'
-                      ? 'bg-inquest-surface text-inquest-accent shadow-sm border border-inquest-rule/40'
-                      : 'text-inquest-ink-soft hover:text-inquest-ink'
-                  }`}
-                >
-                  <Moon size={10} /> Dark
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Danger Zone */}
-        <div className="border border-red-200/50 dark:border-red-950/40 bg-red-50/10 rounded-2xl p-4 space-y-3">
-          <h4 className="text-xs font-bold text-red-700 uppercase tracking-wider flex items-center gap-1.5">
-            <AlertCircle size={14} /> Danger Zone
-          </h4>
-          <p className="text-[10px] text-inquest-ink-soft leading-normal">
-            Deleting this enquiry will permanently remove all questions, configuration, and responses collected. This action is irreversible.
-          </p>
-          <div className="space-y-2">
-            <input
-              type="text"
-              value={deleteConfirmInput}
-              onChange={(e) => setDeleteConfirmInput(e.target.value)}
-              placeholder="Type DELETE to confirm"
-              className="w-full bg-white dark:bg-inquest-base border border-red-200 dark:border-red-950 focus:border-red-500 rounded-xl px-3 py-2 text-xs font-semibold text-inquest-ink placeholder-red-300 focus:outline-none"
-            />
-            <button
-              type="button"
-              onClick={onDelete}
-              disabled={deleteConfirmInput !== 'DELETE' || isDeleting}
-              className="w-full py-2.5 bg-red-600 hover:bg-red-700 disabled:bg-inquest-depth disabled:text-inquest-ink-ghost text-white text-xs font-bold rounded-xl transition cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
-            >
-              <Trash2 size={12} />
-              {isDeleting ? 'Deleting...' : 'Delete Enquiry Permanently'}
-            </button>
-          </div>
-        </div>
-
-      </div>
-
-      {/* Conditionally Render Save Changes Button at the bottom of the sidebar */}
-      {hasDraft && onSave && (
-        <div className="pt-4 border-t border-inquest-rule shrink-0 animate-bounce">
-          <button
-            type="button"
-            onClick={onSave}
-            disabled={isSaving}
-            className="w-full py-3.5 rounded-full bg-inquest-accent hover:bg-inquest-accent-soft text-white font-bold transition flex items-center justify-center gap-2 terracotta-glow cursor-pointer text-sm shadow-md"
-          >
-            <Save size={16} /> Save Changes
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-

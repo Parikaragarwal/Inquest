@@ -5,10 +5,31 @@ import { createContext } from "./context";
 import { getAuthenticationCookie } from "./utils/cookie";
 import { userService } from "./services";
 
+import { logger } from "@repo/logger";
+
 export const tRPCContext = initTRPC
   .meta<OpenApiMeta>()
   .context<typeof createContext>()
-  .create({});
+  .create({
+    errorFormatter({ shape, error }) {
+      logger.error(
+        `[tRPC Error] Code: ${error.code} | Message: ${error.message} | Cause: ${
+          error.cause instanceof Error ? error.cause.stack : JSON.stringify(error.cause || error)
+        }`
+      );
+
+      let message = error.message;
+
+      if (error.code === "INTERNAL_SERVER_ERROR") {
+        message = "An unexpected error occurred. Please try again later.";
+      }
+
+      return {
+        ...shape,
+        message,
+      };
+    },
+  });
 
 export const router = tRPCContext.router;
 

@@ -1,3 +1,4 @@
+import { TRPCError } from "@trpc/server";
 import { userService } from "../../services";
 import { publicProcedure, authenticatedProcedure, router } from "../../trpc";
 import { getAuthenticationCookie, setAuthenticatonCookie } from "../../utils/cookie";
@@ -37,12 +38,26 @@ export const authRouter = router({
     .output(createUserWithEmailAndPasswordOutputModel)
     .mutation(async ({ input }) => {
       const { fullName, email, password } = input;
-      const result = await userService.createUserWithEmailAndPassword({
-        fullName,
-        email,
-        password,
-      });
-      return result;
+      try {
+        const result = await userService.createUserWithEmailAndPassword({
+          fullName,
+          email,
+          password,
+        });
+        return result;
+      } catch (err: any) {
+        const msg = err.message || "";
+        if (msg.includes("already exists")) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "An account with this email address already exists.",
+          });
+        }
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: msg || "Failed to create account",
+        });
+      }
     }),
 
   signInUserWithEmailAndPassword: publicProcedure
@@ -57,20 +72,34 @@ export const authRouter = router({
     .output(signInUserWithEmailAndPasswordOutputModel)
     .mutation(async ({ input, ctx }) => {
       const { email, password } = input;
-      const result = await userService.signinUserWithEmailAndPassword({
-        email,
-        password,
-      });
+      try {
+        const result = await userService.signinUserWithEmailAndPassword({
+          email,
+          password,
+        });
 
-      if (result.token) {
-        setAuthenticatonCookie(ctx, result.token);
+        if (result.token) {
+          setAuthenticatonCookie(ctx, result.token);
+        }
+        
+        return {
+          id: result.id,
+          needsVerification: result.needsVerification,
+          email: result.email,
+        };
+      } catch (err: any) {
+        const msg = err.message || "";
+        if (msg.includes("Invalid Username or Password") || msg.includes("Method")) {
+          throw new TRPCError({
+            code: "UNAUTHORIZED",
+            message: "Incorrect email address or password. Please try again.",
+          });
+        }
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: msg || "Failed to sign in",
+        });
       }
-      
-      return {
-        id: result.id,
-        needsVerification: result.needsVerification,
-        email: result.email,
-      };
     }),
 
   getLoggedInUserInfo: publicProcedure

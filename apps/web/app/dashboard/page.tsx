@@ -4,15 +4,25 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { trpc } from '~/trpc/client';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, X, Globe, Lock, Copy, Eye, FileText, ChevronRight, Users, ClipboardCopy } from 'lucide-react';
+import { 
+  Plus, X, Globe, Lock, Copy, Eye, FileText, ChevronRight, Users, 
+  ClipboardCopy, Edit3, Trash2, MoreVertical 
+} from 'lucide-react';
 import { toast } from 'sonner';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from '~/components/ui/dropdown-menu';
 
 function FormSubmissionCount({ formId }: { formId: string }) {
   const { data } = trpc.submission.getSubmissionCount.useQuery({ formId });
   const count = data?.count ?? 0;
   return (
-    <span className="flex items-center gap-1.5 text-xs text-inquest-ink-soft">
-      <Users size={12} />
+    <span className="flex items-center gap-1.5 text-xs text-inquest-ink-soft font-medium">
+      <Users size={12} className="text-inquest-accent" />
       {count} {count === 1 ? 'response' : 'responses'}
     </span>
   );
@@ -24,6 +34,7 @@ export default function DashboardPage() {
   
   const [showCompanion, setShowCompanion] = useState(true);
   const [newTitle, setNewTitle] = useState('');
+  const [formToDelete, setFormToDelete] = useState<{ id: string; title: string } | null>(null);
 
   const { data: forms, isLoading } = trpc.form.getMyForms.useQuery();
 
@@ -36,6 +47,16 @@ export default function DashboardPage() {
     },
     onError: (error) => {
       toast.error(error.message || 'Failed to create form');
+    }
+  });
+
+  const deleteForm = trpc.form.deleteForm.useMutation({
+    onSuccess: () => {
+      toast.success('Form deleted successfully');
+      utils.form.getMyForms.invalidate();
+    },
+    onError: (error) => {
+      toast.error(error.message || 'Failed to delete form');
     }
   });
 
@@ -70,6 +91,11 @@ export default function DashboardPage() {
     toast.success('Secure code copied!');
   };
 
+  const handleDeleteClick = (formId: string, formTitle: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setFormToDelete({ id: formId, title: formTitle });
+  };
+
   return (
     <div className="space-y-8 sm:space-y-12 pb-24">
       
@@ -82,7 +108,7 @@ export default function DashboardPage() {
             exit={{ opacity: 0, height: 0 }}
             className="overflow-hidden"
           >
-            <div className="bg-inquest-sage/20 border border-inquest-sage/40 rounded-3xl p-5 sm:p-6 relative">
+            <div className="bg-inquest-sage/10 border border-inquest-rule rounded-[2rem] p-5 sm:p-6 relative page-lines" style={{ '--line-height': '2rem' } as React.CSSProperties}>
               <button 
                 onClick={() => setShowCompanion(false)}
                 className="absolute top-3 right-3 sm:top-4 sm:right-4 p-2 text-inquest-ink-soft hover:text-inquest-ink transition-colors rounded-full hover:bg-inquest-depth/30"
@@ -90,7 +116,7 @@ export default function DashboardPage() {
                 <X size={16} />
               </button>
               
-              <h2 className="text-lg sm:text-xl font-serif text-inquest-ink mb-4 font-semibold">Quick-Start Companion</h2>
+              <h2 className="text-lg sm:text-xl font-serif text-inquest-ink mb-4 font-bold">Quick-Start Companion</h2>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
                 {[
                   { title: "1. Create", desc: "Type a title below to start a new form." },
@@ -99,8 +125,8 @@ export default function DashboardPage() {
                   { title: "4. Listen", desc: "Share the link and gather insights." }
                 ].map((step, i) => (
                   <div key={i} className="bg-inquest-surface p-3 sm:p-4 rounded-2xl warm-shadow border border-inquest-rule/50">
-                    <div className="font-medium text-inquest-ink mb-1 text-sm">{step.title}</div>
-                    <div className="text-xs sm:text-sm text-inquest-ink-mid">{step.desc}</div>
+                    <div className="font-bold text-inquest-ink mb-1 text-xs uppercase tracking-wider">{step.title}</div>
+                    <div className="text-xs text-inquest-ink-mid leading-relaxed">{step.desc}</div>
                   </div>
                 ))}
               </div>
@@ -111,22 +137,22 @@ export default function DashboardPage() {
 
       {/* Inline Form Creator */}
       <section>
-        <h2 className="text-xs sm:text-sm font-medium text-inquest-ink-soft mb-3 uppercase tracking-widest pl-2">Create New Form</h2>
+        <h2 className="text-xs sm:text-sm font-bold text-inquest-ink-soft mb-3 uppercase tracking-widest pl-2">Create New Form</h2>
         <form onSubmit={handleCreate} className="relative flex items-center">
           <input 
             type="text"
             value={newTitle}
             onChange={(e) => setNewTitle(e.target.value)}
-            placeholder="E.g., Event Registration Form"
+            placeholder="E.g., Customer Feedback Survey"
             disabled={createForm.isPending}
             className="w-full bg-inquest-surface border border-inquest-rule rounded-full py-3.5 sm:py-4 pl-5 sm:pl-6 pr-28 sm:pr-40 text-base sm:text-lg text-inquest-ink placeholder-inquest-ink-ghost focus:outline-none focus:ring-2 focus:ring-inquest-accent focus:border-transparent transition-all warm-shadow"
           />
           <button 
             type="submit"
             disabled={!newTitle.trim() || createForm.isPending}
-            className="absolute right-1.5 sm:right-2 top-1.5 sm:top-2 bottom-1.5 sm:bottom-2 px-4 sm:px-6 bg-inquest-accent text-white rounded-full font-medium hover:bg-inquest-accent-soft transition-colors disabled:opacity-50 flex items-center gap-2 terracotta-glow text-sm sm:text-base"
+            className="absolute right-1.5 sm:right-2 top-1.5 sm:top-2 bottom-1.5 sm:bottom-2 px-4 sm:px-6 bg-inquest-accent text-white rounded-full font-bold hover:bg-inquest-accent-soft transition-colors disabled:opacity-50 flex items-center gap-2 terracotta-glow text-sm sm:text-base cursor-pointer"
           >
-            {createForm.isPending ? '...' : <><Plus size={18} /> <span className="hidden sm:inline">Create</span></>}
+            {createForm.isPending ? '...' : <><Plus size={18} /> <span>Create</span></>}
           </button>
         </form>
       </section>
@@ -134,8 +160,8 @@ export default function DashboardPage() {
       {/* Active Enquiries Feed */}
       <section>
         <div className="flex items-center justify-between mb-4 sm:mb-6 pl-2">
-          <h2 className="text-xs sm:text-sm font-medium text-inquest-ink-soft uppercase tracking-widest">Active Forms</h2>
-          <span className="bg-inquest-surface text-inquest-ink-mid text-xs px-3 py-1 rounded-full border border-inquest-rule font-medium">
+          <h2 className="text-xs sm:text-sm font-bold text-inquest-ink-soft uppercase tracking-widest">Active Forms</h2>
+          <span className="bg-inquest-surface text-inquest-ink-mid text-xs px-3 py-1 rounded-full border border-inquest-rule font-bold">
             {forms?.length || 0} Total
           </span>
         </div>
@@ -143,14 +169,17 @@ export default function DashboardPage() {
         {isLoading ? (
           <div className="space-y-4">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="h-24 bg-inquest-surface/50 rounded-3xl animate-pulse border border-inquest-rule/30" />
+              <div key={i} className="h-32 bg-inquest-surface/50 rounded-3xl animate-pulse border border-inquest-rule/30" />
             ))}
           </div>
         ) : forms?.length === 0 ? (
-          <div className="text-center py-12 sm:py-16 bg-inquest-surface rounded-3xl border border-inquest-rule border-dashed">
-            <FileText className="mx-auto h-10 w-10 sm:h-12 sm:w-12 text-inquest-ink-ghost mb-4" />
-            <h3 className="text-lg font-serif text-inquest-ink">No forms yet</h3>
-            <p className="text-inquest-ink-mid mt-1 text-sm">Create your first form using the input above.</p>
+          <div className="text-center py-16 px-6 bg-inquest-surface rounded-[2.5rem] border border-inquest-rule warm-shadow relative overflow-hidden page-lines" style={{ '--line-height': '2rem' } as React.CSSProperties}>
+            <div className="absolute top-0 left-0 w-full h-1 bg-inquest-accent" />
+            <FileText className="mx-auto h-12 w-12 text-inquest-ink-ghost mb-4 animate-bounce" />
+            <h3 className="text-2xl font-serif text-inquest-ink font-bold">Your journal is blank.</h3>
+            <p className="text-inquest-ink-mid mt-1 text-sm max-w-sm mx-auto leading-relaxed">
+              Every great enquiry starts with a single question. Use the field above to create your first page.
+            </p>
           </div>
         ) : (
           <div className="space-y-3 sm:space-y-4">
@@ -162,62 +191,135 @@ export default function DashboardPage() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: idx * 0.05 }}
                   onClick={() => router.push(`/dashboard/forms/${form.id}`)}
-                  className="bg-inquest-surface rounded-3xl p-5 sm:p-6 flex items-center justify-between group cursor-pointer border border-inquest-rule/50 card-lift"
+                  className="bg-inquest-surface rounded-3xl p-5 sm:p-6 flex flex-col gap-4 group cursor-pointer border border-inquest-rule/50 card-lift"
                 >
-                  <div className="flex-1 min-w-0 pr-4 sm:pr-6">
-                    <div className="flex items-center gap-2 sm:gap-3 mb-1.5 flex-wrap">
-                      <h3 className="text-lg sm:text-xl font-serif text-inquest-ink truncate font-semibold">
-                        {form.title}
-                      </h3>
-                      {form.secureCode ? (
-                        <span className="flex items-center gap-1 text-[10px] uppercase tracking-wider bg-inquest-depth text-inquest-ink-soft px-2 py-0.5 rounded-full font-bold shrink-0">
-                          <Lock size={10} /> Private
-                        </span>
-                      ) : (
-                        <span className="flex items-center gap-1 text-[10px] uppercase tracking-wider bg-inquest-sage/30 text-inquest-ink-mid px-2 py-0.5 rounded-full font-bold shrink-0">
-                          <Globe size={10} /> Public
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-4 flex-wrap">
-                      <p className="text-sm text-inquest-ink-mid truncate">
-                        {form.description || 'No description'}
+                  {/* Top info row */}
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 sm:gap-3 mb-1.5 flex-wrap">
+                        <h3 className="text-lg sm:text-xl font-serif text-inquest-ink truncate font-bold">
+                          {form.title}
+                        </h3>
+                        {form.secureCode ? (
+                          <span className="flex items-center gap-1 text-[10px] uppercase tracking-wider bg-inquest-depth text-inquest-ink-soft px-2.5 py-0.5 rounded-full font-bold shrink-0">
+                            <Lock size={10} /> Private
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-1 text-[10px] uppercase tracking-wider bg-inquest-accent/10 text-inquest-accent px-2.5 py-0.5 rounded-full font-bold shrink-0">
+                            <Globe size={10} /> Public
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-inquest-ink-soft line-clamp-2">
+                        {form.description || 'No description provided.'}
                       </p>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
                       <FormSubmissionCount formId={form.id} />
+                      <div className="p-1 text-inquest-ink-soft group-hover:text-inquest-accent transition-colors">
+                        <ChevronRight size={18} />
+                      </div>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-                    {/* Copy Secure Code */}
-                    {form.secureCode && (
+                  {/* Horizontal rule */}
+                  <div className="h-px bg-inquest-rule/35" />
+
+                  {/* Bottom action row */}
+                  <div className="flex items-center justify-between">
+                    {/* Desktop Actions */}
+                    <div className="hidden md:flex items-center gap-2 flex-1">
                       <button
-                        onClick={(e) => copySecureCode(form.secureCode!, e)}
-                        className="p-2 text-inquest-ink-soft hover:text-inquest-ink hover:bg-inquest-depth rounded-full transition-colors"
-                        title="Copy Secure Code"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(`/dashboard/forms/${form.id}`);
+                        }}
+                        className="flex items-center gap-1.5 px-3.5 py-2 bg-inquest-depth/50 hover:bg-inquest-depth text-xs font-bold text-inquest-ink rounded-xl transition-colors cursor-pointer border border-inquest-rule/30"
                       >
-                        <ClipboardCopy size={16} />
+                        <Edit3 size={12} />
+                        <span>Edit</span>
                       </button>
-                    )}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        window.open(`/forms/${form.id}`, '_blank');
-                      }}
-                      className="p-2 text-inquest-ink-soft hover:text-inquest-ink hover:bg-inquest-depth rounded-full transition-colors hidden sm:block"
-                      title="Preview Form"
-                    >
-                      <Eye size={16} />
-                    </button>
-                    <button
-                      onClick={(e) => copyLink(form.id, form.secureCode, e)}
-                      className="p-2 text-inquest-ink-soft hover:text-inquest-ink hover:bg-inquest-depth rounded-full transition-colors"
-                      title="Copy Link"
-                    >
-                      <Copy size={16} />
-                    </button>
-                    <div className="hidden sm:block w-px h-6 bg-inquest-rule mx-1" />
-                    <div className="p-2 text-inquest-ink-soft group-hover:text-inquest-accent transition-colors">
-                      <ChevronRight size={18} />
+                      
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          window.open(`/forms/${form.id}`, '_blank');
+                        }}
+                        className="flex items-center gap-1.5 px-3.5 py-2 bg-inquest-depth/50 hover:bg-inquest-depth text-xs font-bold text-inquest-ink rounded-xl transition-colors cursor-pointer border border-inquest-rule/30"
+                      >
+                        <Eye size={12} />
+                        <span>Preview</span>
+                      </button>
+
+                      <button
+                        onClick={(e) => copyLink(form.id, form.secureCode, e)}
+                        className="flex items-center gap-1.5 px-3.5 py-2 bg-inquest-accent/10 hover:bg-inquest-accent/20 text-xs font-bold text-inquest-accent rounded-xl transition-colors cursor-pointer border border-inquest-accent/20"
+                      >
+                        <Copy size={12} />
+                        <span>Copy Link</span>
+                      </button>
+
+                      {form.secureCode && (
+                        <button
+                          onClick={(e) => copySecureCode(form.secureCode!, e)}
+                          className="flex items-center gap-1.5 px-3.5 py-2 bg-inquest-sage/15 hover:bg-inquest-sage/25 text-xs font-bold text-inquest-ink-mid rounded-xl transition-colors cursor-pointer border border-inquest-sage/25"
+                        >
+                          <ClipboardCopy size={12} />
+                          <span>Copy Code</span>
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Desktop Delete button */}
+                    <div className="hidden md:block">
+                      <button
+                        onClick={(e) => handleDeleteClick(form.id, form.title, e)}
+                        className="text-xs text-inquest-ink-ghost hover:text-inquest-caution font-bold hover:underline transition-colors cursor-pointer"
+                      >
+                        Delete
+                      </button>
+                    </div>
+
+                    {/* Mobile Action Dropdown */}
+                    <div className="flex md:hidden w-full items-center justify-between">
+                      <span className="text-[11px] text-inquest-ink-ghost font-bold font-mono">
+                        Created {form.createdAt ? new Date(form.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : 'N/A'}
+                      </span>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button
+                            onClick={(e) => e.stopPropagation()}
+                            className="p-2 text-inquest-ink-soft hover:text-inquest-ink hover:bg-inquest-depth rounded-xl transition-colors cursor-pointer border border-inquest-rule"
+                          >
+                            <MoreVertical size={16} />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-44 bg-inquest-surface border-inquest-rule rounded-xl">
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push(`/dashboard/forms/${form.id}`); }} className="font-medium">
+                            <Edit3 size={14} className="mr-2 text-inquest-ink-soft" /> Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); window.open(`/forms/${form.id}`, '_blank'); }} className="font-medium">
+                            <Eye size={14} className="mr-2 text-inquest-ink-soft" /> Preview
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={(e) => copyLink(form.id, form.secureCode, e)} className="font-medium">
+                            <Copy size={14} className="mr-2 text-inquest-ink-soft" /> Copy Link
+                          </DropdownMenuItem>
+                          {form.secureCode && (
+                            <DropdownMenuItem onClick={(e) => copySecureCode(form.secureCode!, e)} className="font-medium">
+                              <ClipboardCopy size={14} className="mr-2 text-inquest-ink-soft" /> Copy Code
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuSeparator className="bg-inquest-rule/35" />
+                          <DropdownMenuItem
+                            variant="destructive"
+                            onClick={(e) => handleDeleteClick(form.id, form.title, e)}
+                            className="text-red-600 focus:text-red-700 focus:bg-red-50 dark:focus:bg-red-950/20 font-semibold"
+                          >
+                            <Trash2 size={14} className="mr-2" /> Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   </div>
                 </motion.div>
@@ -226,6 +328,44 @@ export default function DashboardPage() {
           </div>
         )}
       </section>
+
+      {/* Delete Confirmation Modal */}
+      <AnimatePresence>
+        {formToDelete && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-xs"
+            onClick={() => setFormToDelete(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-inquest-surface rounded-3xl p-8 max-w-sm w-full warm-shadow text-center border border-inquest-rule/45"
+            >
+              <div className="w-14 h-14 bg-inquest-caution/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Trash2 size={24} className="text-inquest-caution" />
+              </div>
+              <h3 className="text-xl font-serif text-inquest-ink mb-2 font-bold">Delete this Enquiry?</h3>
+              <p className="text-inquest-ink-mid text-sm mb-6">This will permanently remove &ldquo;{formToDelete.title}&rdquo; and all its responses.</p>
+              <div className="flex gap-3">
+                <button onClick={() => setFormToDelete(null)} className="flex-1 py-3 rounded-full border border-inquest-rule text-inquest-ink font-medium hover:bg-inquest-depth/30 transition-colors cursor-pointer">
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    deleteForm.mutate({ id: formToDelete.id });
+                    setFormToDelete(null);
+                  }}
+                  disabled={deleteForm.isPending}
+                  className="flex-1 py-3 rounded-full bg-inquest-caution text-white font-medium hover:opacity-90 transition-colors disabled:opacity-50 cursor-pointer"
+                >
+                  {deleteForm.isPending ? 'Deleting...' : 'Delete'}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
     </div>
   );
