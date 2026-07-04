@@ -19,22 +19,22 @@ const openApiDocument = generateOpenApiDocument(serverRouter, {
 });
 
 
-  app.use(
-    cors({
-      origin: env.CLIENT_URL,
-      credentials:true
-    }),
-  );
+app.use(
+  cors({
+    origin: env.CLIENT_URL,
+    credentials: true
+  }),
+);
 
 app.use(cookieParser());
 app.use(express.json());
 
 app.get("/", (req, res) => {
-  return res.json({ message: "Streamyst is up and running..." });
+  return res.json({ message: "Inquest is up and running..." });
 });
 
 app.get("/health", (req, res) => {
-  return res.json({ message: "Streamyst server is healthy", healthy: true });
+  return res.json({ message: "Inquest server is healthy", healthy: true });
 });
 
 logger.debug(`openapi.json: ${env.BASE_URL}/openapi.json`);
@@ -63,7 +63,7 @@ app.get("/auth/google/callback", async (req, res) => {
 
   try {
     const { token } = await userService.signInWithGoogleAuthorizationCode({ code });
-    
+
     const createCookie = createCookieFactory(res);
     // Mimic the same options as defaultCookieOption in utils/cookie.ts
     const YEAR = 12 * 20 * 24 * 60 * 60 * 1000;
