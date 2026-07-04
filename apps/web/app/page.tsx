@@ -551,6 +551,11 @@ export default function LandingPage() {
 
       {/* Footer */}
       <footer className="relative z-10 py-8 px-6 text-center border-t border-inquest-rule/20">
+        <div className="flex flex-wrap items-center justify-center gap-6 text-xs text-inquest-ink-mid mb-3">
+          <Link href="/" className="hover:text-inquest-ink transition">Home</Link>
+          <Link href="/privacy" className="hover:text-inquest-ink transition">Privacy Policy</Link>
+          <Link href="/terms" className="hover:text-inquest-ink transition">Terms of Service</Link>
+        </div>
         <p className="text-sm text-inquest-ink-ghost">
           © {new Date().getFullYear()} Inquest — Thoughtful enquiries, meaningful insights.
         </p>

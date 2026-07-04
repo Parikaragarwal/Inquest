@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Star, AlertCircle } from 'lucide-react';
+import { Star, AlertCircle, Sun, Moon } from 'lucide-react';
 import { motion } from 'framer-motion';
 import backgroundsData from '~/public/backgrounds.json';
 
@@ -37,6 +37,7 @@ interface FormPreviewProps {
   theme: Record<string, any>;
   mode: 'light' | 'dark';
   interactive?: boolean;
+  onModeToggle?: () => void;
   
   // State from parent (only needed if interactive=true)
   answers?: Record<string, string>;
@@ -81,6 +82,7 @@ export function FormPreview({
   theme,
   mode,
   interactive = false,
+  onModeToggle,
   answers = {},
   onAnswerChange,
   multiSelectAnswers = {},
@@ -204,7 +206,7 @@ export function FormPreview({
     '--color-inquest-base': resolvedBgColor,
     '--color-inquest-surface': resolvedFieldColor,
     '--color-inquest-depth': '#150F0C',
-    '--color-inquest-rule': '#2D1D16',
+    '--color-inquest-rule': 'rgba(255, 255, 255, 0.22)', // Clearly visible input borders in dark mode
     '--color-inquest-ink': '#F2EBE5',
     '--color-inquest-ink-mid': '#D9CFC6',
     '--color-inquest-ink-soft': '#A39387',
@@ -219,7 +221,7 @@ export function FormPreview({
     '--color-inquest-base': resolvedBgColor,
     '--color-inquest-surface': resolvedFieldColor,
     '--color-inquest-depth': '#ECE2DB',
-    '--color-inquest-rule': '#DFD0C4',
+    '--color-inquest-rule': '#DFD0C4', // Clearly visible in light mode
     '--color-inquest-ink': '#3A2312',
     '--color-inquest-ink-mid': '#5B402B',
     '--color-inquest-ink-soft': '#856953',
@@ -243,10 +245,24 @@ export function FormPreview({
     ...localThemeOverrides,
   };
 
+  const getFieldCardBg = (colorHex: string, themeMode: 'light' | 'dark') => {
+    if (!colorHex) return themeMode === 'dark' ? 'rgba(15, 10, 8, 0.85)' : 'rgba(250, 245, 242, 0.85)';
+    if (colorHex.startsWith('#') && colorHex.length === 7) {
+      const r = parseInt(colorHex.substring(1, 3), 16);
+      const g = parseInt(colorHex.substring(3, 5), 16);
+      const b = parseInt(colorHex.substring(5, 7), 16);
+      return `rgba(${r}, ${g}, ${b}, 0.85)`; // 85% opacity
+    }
+    return colorHex;
+  };
+
   const fieldCardStyle: React.CSSProperties = {
-    backgroundColor: resolvedFieldColor,
+    backgroundColor: getFieldCardBg(resolvedFieldColor, mode),
+    backdropFilter: 'blur(10px)',
+    WebkitBackdropFilter: 'blur(10px)',
     color: fieldTextColor,
-    borderColor: fieldTextColor === '#F2EBE5' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)',
+    borderColor: fieldTextColor === '#F2EBE5' ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.08)',
+    borderWidth: '1px',
   };
 
   const getVal = (fid: string) => (interactive ? answers[fid] : localAnswers[fid]) || '';
@@ -289,6 +305,20 @@ export function FormPreview({
         resolvedBg ? 'form-page-overlay' : ''
       }`}
     >
+      {/* Floating Theme Toggle */}
+      {interactive && onModeToggle && (
+        <div className="absolute top-6 right-6 z-30">
+          <button
+            type="button"
+            onClick={onModeToggle}
+            title={mode === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+            className="flex items-center justify-center w-10 h-10 rounded-full bg-inquest-surface/90 hover:bg-inquest-surface border border-inquest-rule/60 text-inquest-accent shadow-sm hover:shadow-md transition-all cursor-pointer backdrop-blur-xs"
+          >
+            {mode === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
+          </button>
+        </div>
+      )}
+
       <div className="max-w-full relative z-10">
         <header
           style={fieldCardStyle}
@@ -343,7 +373,7 @@ export function FormPreview({
                       value={getVal(fid)}
                       onChange={(e) => setVal(fid, e.target.value)}
                       placeholder={field.placeholder || ''}
-                      className="w-full bg-inquest-base border border-inquest-rule focus:border-inquest-accent focus:ring-2 focus:ring-inquest-accent/20 rounded-xl px-4 py-2.5 text-base text-inquest-ink transition"
+                      className="w-full bg-inquest-base border border-inquest-rule focus:border-inquest-accent focus:ring-2 focus:ring-inquest-accent/20 rounded-xl px-4 py-2.5 text-base text-inquest-ink placeholder:text-inquest-ink-soft/60 transition"
                       style={{ focusRingColor: resolvedAccent } as React.CSSProperties}
                     />
                     <ValidationHints validation={field.validation} type="text" />
@@ -359,7 +389,7 @@ export function FormPreview({
                       value={getVal(fid)}
                       onChange={(e) => setVal(fid, e.target.value)}
                       placeholder={field.placeholder || ''}
-                      className="w-full bg-inquest-base border border-inquest-rule focus:border-inquest-accent focus:ring-2 focus:ring-inquest-accent/20 rounded-2xl px-4 py-3 min-h-[120px] resize-none text-base text-inquest-ink transition"
+                      className="w-full bg-inquest-base border border-inquest-rule focus:border-inquest-accent focus:ring-2 focus:ring-inquest-accent/20 rounded-2xl px-4 py-3 min-h-[120px] resize-none text-base text-inquest-ink placeholder:text-inquest-ink-soft/60 transition"
                     />
                     <ValidationHints validation={field.validation} type="text" />
                   </div>
@@ -375,7 +405,7 @@ export function FormPreview({
                       value={getVal(fid)}
                       onChange={(e) => setVal(fid, e.target.value)}
                       placeholder={field.placeholder || ''}
-                      className="w-full bg-inquest-base border border-inquest-rule focus:border-inquest-accent focus:ring-2 focus:ring-inquest-accent/20 rounded-xl px-4 py-2.5 text-base text-inquest-ink transition"
+                      className="w-full bg-inquest-base border border-inquest-rule focus:border-inquest-accent focus:ring-2 focus:ring-inquest-accent/20 rounded-xl px-4 py-2.5 text-base text-inquest-ink placeholder:text-inquest-ink-soft/60 transition"
                     />
                     <ValidationHints validation={field.validation} type="number" />
                   </div>
@@ -390,7 +420,7 @@ export function FormPreview({
                     value={getVal(fid)}
                     onChange={(e) => setVal(fid, e.target.value)}
                     placeholder={field.placeholder || ''}
-                    className="w-full bg-inquest-base border border-inquest-rule focus:border-inquest-accent focus:ring-2 focus:ring-inquest-accent/20 rounded-xl px-4 py-2.5 text-base text-inquest-ink transition"
+                    className="w-full bg-inquest-base border border-inquest-rule focus:border-inquest-accent focus:ring-2 focus:ring-inquest-accent/20 rounded-xl px-4 py-2.5 text-base text-inquest-ink placeholder:text-inquest-ink-soft/60 transition"
                   />
                 )}
 
@@ -417,7 +447,7 @@ export function FormPreview({
                         value={getVal(fid)}
                         onChange={(e) => setVal(fid, e.target.value)}
                         placeholder={field.placeholder || 'Phone number'}
-                        className="flex-1 bg-inquest-base border border-inquest-rule focus:border-inquest-accent focus:ring-2 focus:ring-inquest-accent/20 rounded-xl px-4 py-2.5 text-base text-inquest-ink transition"
+                        className="flex-1 bg-inquest-base border border-inquest-rule focus:border-inquest-accent focus:ring-2 focus:ring-inquest-accent/20 rounded-xl px-4 py-2.5 text-base text-inquest-ink placeholder:text-inquest-ink-soft/60 transition"
                       />
                     </div>
                     <ValidationHints validation={field.validation} type="phone" />
@@ -434,7 +464,7 @@ export function FormPreview({
                       value={getVal(fid)}
                       onChange={(e) => setVal(fid, e.target.value)}
                       placeholder={field.placeholder || ''}
-                      className="w-full bg-inquest-base border border-inquest-rule focus:border-inquest-accent focus:ring-2 focus:ring-inquest-accent/20 rounded-xl px-4 py-2.5 text-base text-inquest-ink transition"
+                      className="w-full bg-inquest-base border border-inquest-rule focus:border-inquest-accent focus:ring-2 focus:ring-inquest-accent/20 rounded-xl px-4 py-2.5 text-base text-inquest-ink placeholder:text-inquest-ink-soft/60 transition"
                     />
                   </div>
                 )}

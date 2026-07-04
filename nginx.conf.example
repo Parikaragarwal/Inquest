@@ -1,0 +1,48 @@
+# =============================================================================
+# Inquest Host Nginx Configuration Template
+# Location on VPS Host: /etc/nginx/sites-available/inquest
+# Symlinked to: /etc/nginx/sites-enabled/inquest
+# =============================================================================
+
+# 1. Frontend Web App (inquest.parikar.in -> Docker container on 127.0.0.1:3002)
+server {
+    server_name inquest.parikar.in;
+
+    client_max_body_size 20M;
+
+    location / {
+        proxy_pass http://127.0.0.1:3002;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+
+# 2. Backend Express API (api.inquest.parikar.in -> Docker container on 127.0.0.1:8000)
+server {
+    server_name api.inquest.parikar.in;
+
+    client_max_body_size 50M;
+
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+
+# -----------------------------------------------------------------------------
+# SSL Setup via Certbot Command (Run on host machine after enabling site):
+# sudo certbot --nginx -d inquest.parikar.in -d api.inquest.parikar.in
+# -----------------------------------------------------------------------------

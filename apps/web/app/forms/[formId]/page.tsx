@@ -333,6 +333,10 @@ function FormSubmissionComponent() {
   const setAnswer = (fieldId: string, value: string) =>
     setAnswers((prev) => ({ ...prev, [fieldId]: value }));
 
+  const toggleVisitorMode = () => {
+    setVisitorMode((m) => (m === 'light' ? 'dark' : 'light'));
+  };
+
   if (!form) return null;
 
   return (
@@ -344,6 +348,7 @@ function FormSubmissionComponent() {
         theme={themeObj}
         mode={visitorMode}
         interactive={true}
+        onModeToggle={toggleVisitorMode}
         answers={answers}
         onAnswerChange={setAnswer}
         multiSelectAnswers={multiSelectAnswers}

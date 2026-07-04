@@ -20,7 +20,14 @@ export const tRPCContext = initTRPC
 
       let message = error.message;
 
-      if (error.code === "INTERNAL_SERVER_ERROR") {
+      if (
+        error.code === "INTERNAL_SERVER_ERROR" ||
+        message.includes("Failed query:") ||
+        message.includes("select ") ||
+        message.includes("insert ") ||
+        message.includes("update ") ||
+        message.includes("delete ")
+      ) {
         message = "An unexpected error occurred. Please try again later.";
       }
 

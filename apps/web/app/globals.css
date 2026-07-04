@@ -257,3 +257,13 @@ html.dark {
     color-mix(in srgb, var(--color-inquest-accent) 15%, transparent) var(--line-height, 2rem)
   );
 }
+
+/* Hide browser number input spinner wheels globally */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+}

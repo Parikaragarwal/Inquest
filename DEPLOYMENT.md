@@ -1,0 +1,129 @@
+# Inquest VPS Deployment Guide
+
+This guide describes how to deploy **Inquest** to your VPS under the standard 3-layer architecture (`control/`, `infra/`, `projects/`).
+
+---
+
+## 🏗 Directory Architecture
+
+Inquest lives inside its isolated directory on the VPS:
+
+```
+/
+├── control/
+├── infra/
+└── projects/
+    └── inquest/             <-- Repository cloned here
+        ├── apps/
+        │   ├── api/
+        │   │   └── Dockerfile
+        │   └── web/
+        │       └── Dockerfile
+        ├── docker-compose.yml
+        ├── .env
+        └── ...
+```
+
+---
+
+## 🔌 Networking & Dependencies
+
+Inquest connects to shared infrastructure over the external `infra-network` bridge network:
+- **PostgreSQL**: `postgres:5432`
+- **Redis**: `redis:6379`
+
+Neither PostgreSQL nor Redis containers are created by Inquest; it connects directly to the shared `infra-network` containers.
+
+---
+
+## 🚀 Step-by-Step Deployment
+
+### Step 1: Clone Repository into `projects/`
+```bash
+cd ~/projects
+git clone <your-repo-url> inquest
+cd inquest
+```
+
+### Step 2: Configure Environment Variables
+Copy `.env.production.example` to `.env` and fill in your secrets and database credentials:
+```bash
+cp .env.production.example .env
+nano .env
+```
+
+Ensure the following variables match your setup:
+- `DATABASE_URL`: `postgres://<user>:<password>@postgres:5432/<db_name>`
+- `REDIS_URL`: `redis://redis:6379`
+- `CLIENT_URL`: `https://inquest.parikar.in`
+- `BASE_URL`: `https://api.inquest.parikar.in`
+- `NEXT_PUBLIC_API_URL`: `https://api.inquest.parikar.in`
+
+### Step 3: Build & Start Containers
+```bash
+docker compose build
+docker compose up -d
+```
+
+Check running containers:
+```bash
+docker compose ps
+```
+You should see:
+- `inquest_web` running on port `127.0.0.1:3002 -> 3000`
+- `inquest_api` running on port `127.0.0.1:8000 -> 8000`
+
+### Step 4: Run Database Migrations
+Execute Drizzle migrations inside the running API container against the shared PostgreSQL database:
+```bash
+docker compose exec inquest_api pnpm db:migrate
+```
+
+### Step 5: Configure Host Nginx & SSL
+Copy the Nginx configuration snippet from `nginx.conf.example` to your host Nginx configuration:
+```bash
+sudo cp nginx.conf.example /etc/nginx/sites-available/inquest
+sudo ln -s /etc/nginx/sites-available/inquest /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+Issue SSL certificates with Certbot:
+```bash
+sudo certbot --nginx -d inquest.parikar.in -d api.inquest.parikar.in
+```
+
+---
+
+## 🔄 Routine Deployment / Update Workflow
+
+Whenever you push changes to your repository, deployment on the VPS requires only:
+
+```bash
+cd ~/projects/inquest
+git pull
+docker compose build
+docker compose up -d
+```
+
+If database schema changes were made:
+```bash
+docker compose exec inquest_api pnpm db:migrate
+```
+
+---
+
+## 🛠 Useful Aliases & Management
+
+- **View Live Logs**:
+  ```bash
+  docker compose logs -f
+  ```
+- **Restart Services**:
+  ```bash
+  docker compose restart
+  ```
+- **Stop Containers**:
+  ```bash
+  docker compose down
+  ```
