@@ -117,7 +117,7 @@ You can also trigger a manual deployment anytime directly on the VPS by running:
 ```bash
 cd /home/deployer/projects/Inquest
 ./scripts/deploy.sh
-```
+``` 
 
 ### 3. Production-Grade Pipeline Features (v2)
 The deployment script (`scripts/deploy.sh`) implements the following production features:
