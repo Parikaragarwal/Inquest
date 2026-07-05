@@ -4,6 +4,9 @@
   "scripts": {
     "build": "dotenv -- turbo build",
     "dev": "dotenv -- turbo dev",
+    "dev:infra": "docker compose -f docker-compose.dev.yml up -d",
+    "dev:clean": "rm -rf .turbo node_modules/.cache apps/web/.turbo apps/api/.turbo packages/*/.turbo apps/web/.next",
+    "dev:setup": "docker compose -f docker-compose.dev.yml up -d && pnpm db:generate && pnpm db:migrate && pnpm dev:clean && pnpm dev",
     "db:generate": "pnpm --filter @repo/database db:generate",
     "db:migrate": "pnpm --filter @repo/database db:migrate",
     "lint": "turbo run lint",
@@ -23,3 +26,4 @@
     "dotenv-cli": "^11.0.0"
   }
 }
+

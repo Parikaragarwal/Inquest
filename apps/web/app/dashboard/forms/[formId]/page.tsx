@@ -330,7 +330,7 @@ const InlineFieldConfig = memo(function InlineFieldConfig({
           type="text"
           value={field.label}
           onChange={(e) => onUpdate({ label: e.target.value })}
-          className="w-full bg-inquest-base border border-inquest-rule focus:border-inquest-accent rounded-xl px-3 py-2 text-inquest-ink text-sm focus:ring-1 focus:ring-inquest-accent/30 transition-colors"
+          className="neo-input w-full rounded-xl px-3 py-2 text-inquest-ink text-sm"
           placeholder="What is your question?"
         />
       </div>
@@ -342,7 +342,7 @@ const InlineFieldConfig = memo(function InlineFieldConfig({
           type="text"
           value={field.placeholder || ''}
           onChange={(e) => onUpdate({ placeholder: e.target.value })}
-          className="w-full bg-inquest-base border border-inquest-rule focus:border-inquest-accent rounded-xl px-3 py-2 text-inquest-ink text-sm transition-colors"
+          className="neo-input w-full rounded-xl px-3 py-2 text-inquest-ink text-sm"
           placeholder="Guide the respondent…"
         />
       </div>
@@ -387,18 +387,18 @@ const InlineFieldConfig = memo(function InlineFieldConfig({
               <div>
                 <label className="block text-[9px] font-bold text-inquest-ink-soft uppercase mb-1">Min Chars</label>
                 <input type="number" min={0} value={v.minLength ?? ''} onChange={(e) => setValidation({ minLength: e.target.value ? Number(e.target.value) : undefined })}
-                  className="w-full bg-inquest-base border border-inquest-rule rounded-lg px-2 py-1.5 text-xs text-inquest-ink" placeholder="None" />
+                  className="neo-input w-full rounded-lg px-2 py-1.5 text-xs text-inquest-ink" placeholder="None" />
               </div>
               <div>
                 <label className="block text-[9px] font-bold text-inquest-ink-soft uppercase mb-1">Max Chars</label>
                 <input type="number" min={0} value={v.maxLength ?? ''} onChange={(e) => setValidation({ maxLength: e.target.value ? Number(e.target.value) : undefined })}
-                  className="w-full bg-inquest-base border border-inquest-rule rounded-lg px-2 py-1.5 text-xs text-inquest-ink" placeholder="None" />
+                  className="neo-input w-full rounded-lg px-2 py-1.5 text-xs text-inquest-ink" placeholder="None" />
               </div>
             </div>
             <div>
               <label className="block text-[9px] font-bold text-inquest-ink-soft uppercase mb-1">Regex Pattern</label>
               <input type="text" value={v.pattern ?? ''} onChange={(e) => setValidation({ pattern: e.target.value || undefined })}
-                className="w-full bg-inquest-base border border-inquest-rule rounded-lg px-2 py-1.5 text-xs font-mono text-inquest-ink" placeholder="e.g. ^[A-Z]+" />
+                className="neo-input w-full rounded-lg px-2 py-1.5 text-xs font-mono text-inquest-ink" placeholder="e.g. ^[A-Z]+" />
             </div>
           </div>
         )}
@@ -408,12 +408,12 @@ const InlineFieldConfig = memo(function InlineFieldConfig({
             <div>
               <label className="block text-[9px] font-bold text-inquest-ink-soft uppercase mb-1">Min Value</label>
               <input type="number" value={v.min ?? ''} onChange={(e) => setValidation({ min: e.target.value ? Number(e.target.value) : undefined })}
-                className="w-full bg-inquest-base border border-inquest-rule rounded-lg px-2 py-1.5 text-xs text-inquest-ink" placeholder="None" />
+                className="neo-input w-full rounded-lg px-2 py-1.5 text-xs text-inquest-ink" placeholder="None" />
             </div>
             <div>
               <label className="block text-[9px] font-bold text-inquest-ink-soft uppercase mb-1">Max Value</label>
               <input type="number" value={v.max ?? ''} onChange={(e) => setValidation({ max: e.target.value ? Number(e.target.value) : undefined })}
-                className="w-full bg-inquest-base border border-inquest-rule rounded-lg px-2 py-1.5 text-xs text-inquest-ink" placeholder="None" />
+                className="neo-input w-full rounded-lg px-2 py-1.5 text-xs text-inquest-ink" placeholder="None" />
             </div>
           </div>
         )}
@@ -423,12 +423,12 @@ const InlineFieldConfig = memo(function InlineFieldConfig({
             <div>
               <label className="block text-[9px] font-bold text-inquest-ink-soft uppercase mb-1">Earliest</label>
               <input type="date" value={v.minDate ?? ''} onChange={(e) => setValidation({ minDate: e.target.value || undefined })}
-                className="w-full bg-inquest-base border border-inquest-rule rounded-lg px-2 py-1 text-xs text-inquest-ink" />
+                className="neo-input w-full rounded-lg px-2 py-1 text-xs text-inquest-ink" />
             </div>
             <div>
               <label className="block text-[9px] font-bold text-inquest-ink-soft uppercase mb-1">Latest</label>
               <input type="date" value={v.maxDate ?? ''} onChange={(e) => setValidation({ maxDate: e.target.value || undefined })}
-                className="w-full bg-inquest-base border border-inquest-rule rounded-lg px-2 py-1 text-xs text-inquest-ink" />
+                className="neo-input w-full rounded-lg px-2 py-1 text-xs text-inquest-ink" />
             </div>
           </div>
         )}
@@ -438,7 +438,7 @@ const InlineFieldConfig = memo(function InlineFieldConfig({
             <div>
               <label className="block text-[9px] font-bold text-inquest-ink-soft uppercase mb-1">Dial Prefix</label>
               <select value={v.countryCode ?? ''} onChange={(e) => setValidation({ countryCode: e.target.value || undefined })}
-                className="w-full bg-inquest-base border border-inquest-rule rounded-lg px-2 py-1.5 text-xs text-inquest-ink focus:outline-none">
+                className="neo-input w-full rounded-lg px-2 py-1.5 text-xs text-inquest-ink">
                 {COUNTRY_CODES.map((c) => (<option key={c.value} value={c.value}>{c.label}</option>))}
               </select>
             </div>
@@ -446,12 +446,12 @@ const InlineFieldConfig = memo(function InlineFieldConfig({
               <div>
                 <label className="block text-[9px] font-bold text-inquest-ink-soft uppercase mb-1">Min Digits</label>
                 <input type="number" min={0} value={v.minLength ?? ''} onChange={(e) => setValidation({ minLength: e.target.value ? Number(e.target.value) : undefined })}
-                  className="w-full bg-inquest-base border border-inquest-rule rounded-lg px-2 py-1.5 text-xs text-inquest-ink" />
+                  className="neo-input w-full rounded-lg px-2 py-1.5 text-xs text-inquest-ink" />
               </div>
               <div>
                 <label className="block text-[9px] font-bold text-inquest-ink-soft uppercase mb-1">Max Digits</label>
                 <input type="number" min={0} value={v.maxLength ?? ''} onChange={(e) => setValidation({ maxLength: e.target.value ? Number(e.target.value) : undefined })}
-                  className="w-full bg-inquest-base border border-inquest-rule rounded-lg px-2 py-1.5 text-xs text-inquest-ink" />
+                  className="neo-input w-full rounded-lg px-2 py-1.5 text-xs text-inquest-ink" />
               </div>
             </div>
           </div>
@@ -461,7 +461,7 @@ const InlineFieldConfig = memo(function InlineFieldConfig({
           <div>
             <label className="block text-[9px] font-bold text-inquest-ink-soft uppercase mb-1">Max Stars</label>
             <input type="number" min={1} max={10} value={v.max ?? 5} onChange={(e) => setValidation({ max: e.target.value ? Number(e.target.value) : 5 })}
-              className="w-full bg-inquest-base border border-inquest-rule rounded-lg px-2.5 py-1.5 text-xs text-inquest-ink font-bold" />
+              className="neo-input w-full rounded-lg px-2.5 py-1.5 text-xs text-inquest-ink font-bold" />
           </div>
         )}
 
@@ -478,7 +478,7 @@ const InlineFieldConfig = memo(function InlineFieldConfig({
                     opts[i] = e.target.value;
                     setValidation({ options: opts });
                   }}
-                  className="flex-1 bg-inquest-base border border-inquest-rule rounded-lg px-2 py-1 text-xs text-inquest-ink"
+                  className="neo-input flex-1 rounded-lg px-2 py-1 text-xs text-inquest-ink"
                 />
                 <button onClick={() => setValidation({ options: (v.options || []).filter((_: any, j: number) => j !== i) })}
                   className="p-1 text-inquest-ink-soft hover:text-inquest-caution transition-colors">
@@ -490,7 +490,7 @@ const InlineFieldConfig = memo(function InlineFieldConfig({
               <div>
                 <label className="block text-[9px] font-bold text-inquest-ink-soft uppercase mb-1">Max Selections</label>
                 <input type="number" min={1} value={v.maxSelections ?? ''} onChange={(e) => setValidation({ maxSelections: e.target.value ? Number(e.target.value) : undefined })}
-                  className="w-full bg-inquest-base border border-inquest-rule rounded-lg px-2 py-1.5 text-xs text-inquest-ink" placeholder="Unlimited" />
+                  className="neo-input w-full rounded-lg px-2 py-1.5 text-xs text-inquest-ink" placeholder="Unlimited" />
               </div>
             )}
             <button
@@ -1310,7 +1310,7 @@ export default function FormBuilderPage() {
   const handleSave = () => {
     updateForm.mutate({
       id: formId,
-      title,
+      title: title.trim() || 'Untitled Enquiry',
       description: description || undefined,
       isOpenForSubmission,
       requiresAuth,
@@ -1318,7 +1318,7 @@ export default function FormBuilderPage() {
       theme,
       fields: fields.map((f, i) => ({
         id: f.id,
-        label: f.label,
+        label: f.label.trim() || 'Untitled Question',
         type: f.type as any,
         required: f.required,
         placeholder: f.placeholder || undefined,
@@ -1364,7 +1364,8 @@ export default function FormBuilderPage() {
 
     const newField: FormField = {
       localId: crypto.randomUUID(),
-      label: 'New Question',
+      // Empty label — shows placeholder 'Untitled Question' instead of pre-filled text
+      label: '',
       type,
       required: false,
       orderIndex: fields.length > 0 ? Number(fields[fields.length - 1]!.orderIndex) + 10 : 0,
@@ -1425,7 +1426,9 @@ export default function FormBuilderPage() {
   // ─── Render ─────────────────────────────────────────────────
 
   return (
-    <div className="h-[calc(100vh-56px)] md:h-screen flex flex-col -mx-6 -my-6 sm:-mx-8 sm:-my-8 md:-mx-12 md:-my-12 pt-16 md:pt-0 overflow-hidden bg-transparent">
+    <div className={`h-[calc(100vh-56px)] md:h-screen flex flex-col -mx-6 -my-6 sm:-mx-8 sm:-my-8 md:-mx-12 md:-my-12 pt-16 md:pt-0 overflow-hidden bg-transparent border-2 rounded-none transition-all duration-500 ${
+      hasDraft ? 'unsaved-glow border-inquest-accent/40' : 'border-transparent'
+    }`}>
 
       {/* ── Header bar ─────────────────────────────────────── */}
       <header className="bg-inquest-surface/95 backdrop-blur-sm border-b border-inquest-rule p-4 sm:p-5 shrink-0 z-10 sticky top-0 flex items-center justify-between gap-3 shadow-xs">
@@ -1465,10 +1468,10 @@ export default function FormBuilderPage() {
             <button
               onClick={handleSave}
               disabled={updateForm.isPending}
-              className="flex items-center gap-1.5 bg-inquest-accent text-white px-4 py-1.5 rounded-xl font-bold hover:bg-inquest-accent-soft transition-colors terracotta-glow text-xs animate-pulse cursor-pointer shadow-xs"
+              className="flex items-center gap-2 bg-inquest-accent text-white px-5 py-2 rounded-xl font-extrabold hover:bg-inquest-accent-soft transition-all terracotta-glow text-sm cursor-pointer shadow-md ring-2 ring-inquest-accent/30 ring-offset-1"
             >
-              <Save size={12} />
-              <span>{updateForm.isPending ? 'Saving…' : 'Save'}</span>
+              <Save size={14} />
+              <span>{updateForm.isPending ? 'Saving…' : 'Save Changes'}</span>
             </button>
           ) : (
             <div className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-inquest-depth/50 text-inquest-ink-soft text-[10px] font-bold select-none border border-inquest-rule/30">
@@ -1478,6 +1481,43 @@ export default function FormBuilderPage() {
           )}
         </div>
       </header>
+
+      {/* ── Unsaved changes banner ──────────────────────────── */}
+      <AnimatePresence>
+        {hasDraft && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.22 }}
+            className="shrink-0 overflow-hidden"
+          >
+            <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-2.5 bg-amber-50 dark:bg-amber-950/30 border-b border-amber-200 dark:border-amber-800/50">
+              <div className="flex items-center gap-2">
+                <span className="text-amber-600 dark:text-amber-400 text-sm">⚠</span>
+                <span className="text-xs font-semibold text-amber-800 dark:text-amber-300">
+                  You have unsaved changes — URL and QR code are hidden until saved.
+                </span>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={discardDraft}
+                  className="text-xs font-bold text-amber-700 dark:text-amber-400 hover:underline cursor-pointer"
+                >
+                  Discard
+                </button>
+                <button
+                  onClick={handleSave}
+                  disabled={updateForm.isPending}
+                  className="text-xs font-extrabold bg-amber-600 hover:bg-amber-700 text-white px-3 py-1.5 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  {updateForm.isPending ? 'Saving…' : 'Save Now'}
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ── Main content + DiarySpine ──────────────────────── */}
       <div className="flex-1 flex flex-col overflow-hidden" style={{ perspective: '1200px' }}>
@@ -1745,7 +1785,37 @@ export default function FormBuilderPage() {
                       </div>
                     </div>
 
-                    {/* Share & QR Controls */}
+                    {/* Share & QR Controls — only shown when form is saved */}
+                    {hasDraft ? (
+                      /* Save-first card — shown instead of URL/QR when there are unsaved changes */
+                      <div className="bg-amber-50 dark:bg-amber-950/20 border-2 border-amber-300 dark:border-amber-700/50 border-dashed rounded-[2rem] p-6 sm:p-8 space-y-4 text-center">
+                        <div className="w-14 h-14 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center mx-auto">
+                          <Save size={24} className="text-amber-600 dark:text-amber-400" />
+                        </div>
+                        <div>
+                          <h3 className="font-serif text-xl font-bold text-amber-900 dark:text-amber-200 mb-1">Save your changes first</h3>
+                          <p className="text-sm text-amber-700 dark:text-amber-400 max-w-sm mx-auto leading-relaxed">
+                            Your shareable link and QR code will appear here once you save. This keeps your share links accurate.
+                          </p>
+                        </div>
+                        <div className="flex gap-3 justify-center">
+                          <button
+                            onClick={discardDraft}
+                            className="px-5 py-2.5 rounded-full border border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-300 font-medium text-sm hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors cursor-pointer"
+                          >
+                            Discard Changes
+                          </button>
+                          <button
+                            onClick={handleSave}
+                            disabled={updateForm.isPending}
+                            className="px-6 py-2.5 rounded-full bg-inquest-accent text-white font-bold text-sm hover:bg-inquest-accent-soft transition-colors terracotta-glow cursor-pointer disabled:opacity-50 flex items-center gap-2"
+                          >
+                            <Save size={14} />
+                            {updateForm.isPending ? 'Saving…' : 'Save & Show Share Link'}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
                     <div className="bg-inquest-surface border border-inquest-rule rounded-[2rem] p-6 sm:p-8 space-y-6 warm-shadow">
                       <div className="flex items-center justify-between border-b border-inquest-rule/40 pb-4">
                         <h3 className="font-serif text-xl font-bold text-inquest-ink flex items-center gap-2">
@@ -1865,7 +1935,7 @@ export default function FormBuilderPage() {
                           )}
                         </div>
 
-                        {/* QR Code — always visible */}
+                        {/* QR Code */}
                         {qrUrl && (
                           <div className="flex flex-col items-center gap-3 sm:border-l sm:border-inquest-rule/40 sm:pl-5">
                             <div className="bg-white p-4 rounded-2xl border border-inquest-rule/40 shadow-inner">
@@ -1878,6 +1948,7 @@ export default function FormBuilderPage() {
                         )}
                       </div>
                     </div>
+                    )}
 
                     {/* Publish CTA */}
                     <div className="space-y-3">

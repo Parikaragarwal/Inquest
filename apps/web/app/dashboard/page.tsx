@@ -6,7 +6,8 @@ import { trpc } from '~/trpc/client';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Plus, X, Globe, Lock, Copy, Eye, FileText, ChevronRight, Users, 
-  ClipboardCopy, Edit3, Trash2, MoreVertical, Sparkles 
+  ClipboardCopy, Edit3, Trash2, MoreVertical, Sparkles, 
+  ToggleLeft, ToggleRight, ShieldCheck, ShieldOff, LogIn, LogOut 
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -28,6 +29,44 @@ function FormSubmissionCount({ formId }: { formId: string }) {
   );
 }
 
+// ─── Inline Toggle Button ────────────────────────────────────────
+function QuickToggle({
+  enabled,
+  enabledLabel,
+  disabledLabel,
+  enabledIcon: EnabledIcon,
+  disabledIcon: DisabledIcon,
+  enabledClass,
+  disabledClass,
+  onClick,
+  loading,
+}: {
+  enabled: boolean;
+  enabledLabel: string;
+  disabledLabel: string;
+  enabledIcon: React.ElementType;
+  disabledIcon: React.ElementType;
+  enabledClass: string;
+  disabledClass: string;
+  onClick: (e: React.MouseEvent) => void;
+  loading?: boolean;
+}) {
+  const Icon = enabled ? EnabledIcon : DisabledIcon;
+  return (
+    <button
+      onClick={onClick}
+      disabled={loading}
+      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border disabled:opacity-50 ${
+        enabled ? enabledClass : disabledClass
+      }`}
+      title={enabled ? `Click to: ${disabledLabel}` : `Click to: ${enabledLabel}`}
+    >
+      <Icon size={12} />
+      <span>{enabled ? enabledLabel : disabledLabel}</span>
+    </button>
+  );
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const utils = trpc.useUtils();
@@ -35,6 +74,14 @@ export default function DashboardPage() {
   const [showCompanion, setShowCompanion] = useState(true);
   const [newTitle, setNewTitle] = useState('');
   const [formToDelete, setFormToDelete] = useState<{ id: string; title: string } | null>(null);
+
+  // ─── Quick action confirmation state ────────────────────────
+  type QuickActionConfirm = {
+    formId: string;
+    formTitle: string;
+    action: 'closeSubmissions' | 'openSubmissions' | 'enableAuth' | 'disableAuth';
+  };
+  const [pendingAction, setPendingAction] = useState<QuickActionConfirm | null>(null);
 
   const { data: forms, isLoading } = trpc.form.getMyForms.useQuery();
 
@@ -58,6 +105,22 @@ export default function DashboardPage() {
     onError: (error) => {
       toast.error(error.message || 'Failed to delete form');
     }
+  });
+
+  const setSubmissionStatus = trpc.form.setFormSubmissionStatus.useMutation({
+    onSuccess: (_, vars) => {
+      toast.success(vars.isOpenForSubmission ? 'Form is now accepting responses' : 'Form submissions closed');
+      utils.form.getMyForms.invalidate();
+    },
+    onError: (error) => toast.error(error.message || 'Failed to update submission status'),
+  });
+
+  const updateForm = trpc.form.updateForm.useMutation({
+    onSuccess: (_, vars) => {
+      toast.success((vars as any).requiresAuth ? 'Login now required to submit' : 'Login requirement removed');
+      utils.form.getMyForms.invalidate();
+    },
+    onError: (error) => toast.error(error.message || 'Failed to update form'),
   });
 
   const handleCreate = (e: React.FormEvent) => {
@@ -95,6 +158,57 @@ export default function DashboardPage() {
   const handleDeleteClick = (formId: string, formTitle: string, e: React.MouseEvent) => {
     e.stopPropagation();
     setFormToDelete({ id: formId, title: formTitle });
+  };
+
+  // Show a confirmation before triggering a quick action
+  const triggerQuickAction = (action: QuickActionConfirm['action'], formId: string, formTitle: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setPendingAction({ formId, formTitle, action });
+  };
+
+  // Confirm and execute the pending quick action
+  const confirmQuickAction = () => {
+    if (!pendingAction) return;
+    const { formId, action } = pendingAction;
+
+    if (action === 'closeSubmissions') {
+      setSubmissionStatus.mutate({ id: formId, isOpenForSubmission: false });
+    } else if (action === 'openSubmissions') {
+      setSubmissionStatus.mutate({ id: formId, isOpenForSubmission: true });
+    } else if (action === 'enableAuth') {
+      updateForm.mutate({ id: formId, requiresAuth: true } as any);
+    } else if (action === 'disableAuth') {
+      updateForm.mutate({ id: formId, requiresAuth: false } as any);
+    }
+    setPendingAction(null);
+  };
+
+  // Confirmation modal content per action
+  const actionMeta: Record<QuickActionConfirm['action'], { title: string; desc: string; confirmLabel: string; confirmClass: string }> = {
+    closeSubmissions: {
+      title: 'Close Submissions?',
+      desc: 'Respondents will no longer be able to submit this form. You can reopen it at any time.',
+      confirmLabel: 'Yes, Close Submissions',
+      confirmClass: 'bg-inquest-caution hover:opacity-90 text-white',
+    },
+    openSubmissions: {
+      title: 'Open for Submissions?',
+      desc: 'This form will become accepting responses immediately. Anyone with the link can submit.',
+      confirmLabel: 'Yes, Accept Responses',
+      confirmClass: 'bg-inquest-accent hover:bg-inquest-accent-soft text-white',
+    },
+    enableAuth: {
+      title: 'Require Login to Submit?',
+      desc: 'Only users with an account will be able to submit this form. Anonymous submissions will be blocked.',
+      confirmLabel: 'Yes, Require Login',
+      confirmClass: 'bg-inquest-accent hover:bg-inquest-accent-soft text-white',
+    },
+    disableAuth: {
+      title: 'Allow Anonymous Submissions?',
+      desc: 'Anyone with the link — without an account — will be able to submit this form.',
+      confirmLabel: 'Yes, Allow Anyone',
+      confirmClass: 'bg-inquest-caution hover:opacity-90 text-white',
+    },
   };
 
   return (
@@ -181,7 +295,7 @@ export default function DashboardPage() {
         {isLoading ? (
           <div className="space-y-4">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="h-32 bg-inquest-surface/50 rounded-3xl animate-pulse border border-inquest-rule/30" />
+              <div key={i} className="h-40 bg-inquest-surface/50 rounded-3xl animate-pulse border border-inquest-rule/30" />
             ))}
           </div>
         ) : forms?.length === 0 ? (
@@ -233,6 +347,52 @@ export default function DashboardPage() {
                         <ChevronRight size={18} />
                       </div>
                     </div>
+                  </div>
+
+                  {/* ─── Quick-Action Toggle Row ──────────────── */}
+                  <div
+                    className="flex items-center gap-2 flex-wrap"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {/* Accepting Responses toggle */}
+                    <QuickToggle
+                      enabled={form.isOpenForSubmission}
+                      enabledLabel="Accepting Responses"
+                      disabledLabel="Submissions Closed"
+                      enabledIcon={ToggleRight}
+                      disabledIcon={ToggleLeft}
+                      enabledClass="bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/50"
+                      disabledClass="bg-inquest-depth/40 text-inquest-ink-soft border-inquest-rule/40"
+                      loading={setSubmissionStatus.isPending}
+                      onClick={(e) =>
+                        triggerQuickAction(
+                          form.isOpenForSubmission ? 'closeSubmissions' : 'openSubmissions',
+                          form.id,
+                          form.title,
+                          e
+                        )
+                      }
+                    />
+
+                    {/* Require Login toggle */}
+                    <QuickToggle
+                      enabled={form.requiresAuth}
+                      enabledLabel="Login Required"
+                      disabledLabel="Open to Anyone"
+                      enabledIcon={ShieldCheck}
+                      disabledIcon={ShieldOff}
+                      enabledClass="bg-inquest-accent/10 text-inquest-accent border-inquest-accent/20"
+                      disabledClass="bg-inquest-depth/40 text-inquest-ink-soft border-inquest-rule/40"
+                      loading={updateForm.isPending}
+                      onClick={(e) =>
+                        triggerQuickAction(
+                          form.requiresAuth ? 'disableAuth' : 'enableAuth',
+                          form.id,
+                          form.title,
+                          e
+                        )
+                      }
+                    />
                   </div>
 
                   {/* Horizontal rule */}
@@ -307,7 +467,7 @@ export default function DashboardPage() {
                             <MoreVertical size={16} />
                           </button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-44 bg-inquest-surface border-inquest-rule rounded-xl">
+                        <DropdownMenuContent align="end" className="w-48 bg-inquest-surface border-inquest-rule rounded-xl">
                           <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push(`/dashboard/forms/${form.id}`); }} className="font-medium">
                             <Edit3 size={14} className="mr-2 text-inquest-ink-soft" /> Edit
                           </DropdownMenuItem>
@@ -322,6 +482,37 @@ export default function DashboardPage() {
                               <ClipboardCopy size={14} className="mr-2 text-inquest-ink-soft" /> Copy Code
                             </DropdownMenuItem>
                           )}
+                          <DropdownMenuSeparator className="bg-inquest-rule/35" />
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              triggerQuickAction(
+                                form.isOpenForSubmission ? 'closeSubmissions' : 'openSubmissions',
+                                form.id, form.title, e
+                              );
+                            }}
+                            className="font-medium"
+                          >
+                            {form.isOpenForSubmission
+                              ? <><ToggleLeft size={14} className="mr-2" /> Close Submissions</>
+                              : <><ToggleRight size={14} className="mr-2" /> Open Submissions</>
+                            }
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              triggerQuickAction(
+                                form.requiresAuth ? 'disableAuth' : 'enableAuth',
+                                form.id, form.title, e
+                              );
+                            }}
+                            className="font-medium"
+                          >
+                            {form.requiresAuth
+                              ? <><LogOut size={14} className="mr-2" /> Remove Login Req.</>
+                              : <><LogIn size={14} className="mr-2" /> Require Login</>
+                            }
+                          </DropdownMenuItem>
                           <DropdownMenuSeparator className="bg-inquest-rule/35" />
                           <DropdownMenuItem
                             variant="destructive"
@@ -340,6 +531,56 @@ export default function DashboardPage() {
           </div>
         )}
       </section>
+
+      {/* ─── Quick Action Confirmation Modal ─────────────────── */}
+      <AnimatePresence>
+        {pendingAction && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-xs"
+            onClick={() => setPendingAction(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-inquest-surface rounded-3xl p-8 max-w-sm w-full warm-shadow text-center border border-inquest-rule/45"
+            >
+              <div className="w-14 h-14 bg-inquest-accent/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                {pendingAction.action === 'closeSubmissions' || pendingAction.action === 'disableAuth'
+                  ? <ShieldOff size={24} className="text-inquest-caution" />
+                  : <ShieldCheck size={24} className="text-inquest-accent" />
+                }
+              </div>
+              <h3 className="text-xl font-serif text-inquest-ink mb-2 font-bold">
+                {actionMeta[pendingAction.action].title}
+              </h3>
+              <p className="text-inquest-ink-soft text-sm mb-1 font-semibold italic">
+                &ldquo;{pendingAction.formTitle}&rdquo;
+              </p>
+              <p className="text-inquest-ink-mid text-sm mb-6 leading-relaxed">
+                {actionMeta[pendingAction.action].desc}
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setPendingAction(null)}
+                  className="flex-1 py-3 rounded-full border border-inquest-rule text-inquest-ink font-medium hover:bg-inquest-depth/30 transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmQuickAction}
+                  disabled={setSubmissionStatus.isPending || updateForm.isPending}
+                  className={`flex-1 py-3 rounded-full font-medium transition-colors disabled:opacity-50 cursor-pointer ${actionMeta[pendingAction.action].confirmClass}`}
+                >
+                  {setSubmissionStatus.isPending || updateForm.isPending
+                    ? 'Updating…'
+                    : actionMeta[pendingAction.action].confirmLabel}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Delete Confirmation Modal */}
       <AnimatePresence>

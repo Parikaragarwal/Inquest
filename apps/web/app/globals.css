@@ -61,6 +61,39 @@
   100% { opacity: 1; transform: translateY(0); }
 }
 
+/* ─── Unsaved changes glow ──────────────────────────────────── */
+@keyframes unsaved-pulse {
+  0%, 100% {
+    box-shadow:
+      0 0 0 0 rgba(200, 90, 23, 0),
+      inset 0 0 0 0 rgba(200, 90, 23, 0);
+  }
+  50% {
+    box-shadow:
+      0 0 24px 6px rgba(200, 90, 23, 0.14),
+      inset 0 0 16px 2px rgba(200, 90, 23, 0.05);
+  }
+}
+.unsaved-glow {
+  animation: unsaved-pulse 2.4s ease-in-out infinite;
+  border-color: rgba(200, 90, 23, 0.4) !important;
+}
+.dark .unsaved-glow {
+  animation: unsaved-pulse-dark 2.4s ease-in-out infinite;
+}
+@keyframes unsaved-pulse-dark {
+  0%, 100% {
+    box-shadow:
+      0 0 0 0 rgba(224, 111, 40, 0),
+      inset 0 0 0 0 rgba(224, 111, 40, 0);
+  }
+  50% {
+    box-shadow:
+      0 0 28px 8px rgba(224, 111, 40, 0.18),
+      inset 0 0 18px 2px rgba(224, 111, 40, 0.07);
+  }
+}
+
 /* ─────────────────────────────────────────────────────────────
    BODY — "Lined Notebook Page" (Light Mode)
    Warm cream paper with nature background, faint HORIZONTAL
@@ -87,7 +120,7 @@ body {
     ),
     /* Warm parchment overlay for readability over the nature image */
     linear-gradient(180deg, rgba(245, 239, 235, 0.70) 0%, rgba(245, 239, 235, 0.58) 40%, rgba(245, 239, 235, 0.72) 100%),
-    /* Light mode nature background image */
+    /* Light mode nature background image — self-hosted */
     var(--light-bg-image, linear-gradient(180deg, #F5EFEB 0%, #F5EFEB 100%));
   background-size: auto, auto, auto, auto, cover;
   background-position: center, center, center, center, center 30%;
@@ -97,8 +130,6 @@ body {
 
 /* ─────────────────────────────────────────────────────────────
    BODY — "Moonlit Lake Diary" (Dark Mode)
-   Moonlit mountain lake with stars, overlaid with warm amber
-   ruled lines — writing in a diary by the lake at midnight.
    ───────────────────────────────────────────────────────────── */
 .dark body {
   background-image:
@@ -114,7 +145,7 @@ body {
     ),
     /* Deep overlay for readability */
     linear-gradient(180deg, rgba(11, 7, 5, 0.82) 0%, rgba(11, 7, 5, 0.65) 40%, rgba(11, 7, 5, 0.85) 100%),
-    /* The moonlit lake image */
+    /* The moonlit lake image — self-hosted */
     var(--dark-bg-image, linear-gradient(180deg, #0B0705 0%, #0D0907 100%));
   background-size: auto, auto, auto, cover;
   background-position: center, center, center, center 40%;
@@ -122,12 +153,12 @@ body {
   background-repeat: repeat, repeat, no-repeat, no-repeat;
 }
 
-/* Apply the image via CSS custom property so it can be updated easily */
+/* Apply the images via CSS custom property — self-hosted from /public/images/ */
 html {
-  --light-bg-image: url('https://images.unsplash.com/photo-1759049219585-4feb729fb018?fm=jpg&q=60&w=3000&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D');
+  --light-bg-image: url('/images/bg-light.jpg');
 }
 html.dark {
-  --dark-bg-image: url('https://images.unsplash.com/photo-1470770903676-69b98201ea1c?w=1920&q=80&auto=format&fit=crop');
+  --dark-bg-image: url('/images/bg-dark.jpg');
 }
 
 /* ─── Paper Roll Theme Transition ─────────────────────────── */
@@ -195,6 +226,49 @@ html.dark {
   .animate-fade-in-up {
     animation: fade-in-up 0.5s ease-out forwards;
   }
+}
+
+/* ─── Neomorphic form inputs ────────────────────────────────── */
+/* Light mode: soft pressed-in look with warm shadows */
+.neo-input {
+  background: var(--color-inquest-surface);
+  border: 1.5px solid var(--color-inquest-rule);
+  box-shadow:
+    inset 2px 2px 6px rgba(100, 70, 50, 0.08),
+    inset -2px -2px 6px rgba(255, 252, 248, 0.85),
+    0 1px 2px rgba(100, 70, 50, 0.04);
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+  outline: none;
+}
+.neo-input:focus {
+  border-color: var(--color-inquest-accent);
+  box-shadow:
+    inset 1px 1px 4px rgba(100, 70, 50, 0.06),
+    inset -1px -1px 4px rgba(255, 252, 248, 0.7),
+    0 0 0 3px var(--color-inquest-accent-pale),
+    0 0 0 4px rgba(200, 90, 23, 0.2);
+}
+.neo-input::placeholder {
+  color: var(--color-inquest-ink-ghost);
+  font-style: italic;
+}
+
+/* Dark mode neomorphic overrides */
+.dark .neo-input {
+  background: var(--color-inquest-depth);
+  border-color: var(--color-inquest-rule);
+  box-shadow:
+    inset 2px 2px 6px rgba(0, 0, 0, 0.35),
+    inset -2px -2px 6px rgba(255, 255, 255, 0.03),
+    0 1px 2px rgba(0, 0, 0, 0.2);
+}
+.dark .neo-input:focus {
+  border-color: var(--color-inquest-accent);
+  box-shadow:
+    inset 1px 1px 4px rgba(0, 0, 0, 0.3),
+    inset -1px -1px 4px rgba(255, 255, 255, 0.02),
+    0 0 0 3px var(--color-inquest-accent-pale),
+    0 0 0 4px rgba(224, 111, 40, 0.25);
 }
 
 /* ─── Field card lift ──────────────────────────────────────── */

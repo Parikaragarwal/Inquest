@@ -92,22 +92,17 @@ function FloatingMagnifier({ size = 60 }: { size?: number }) {
   );
 }
 
-// Each paper plane drifts across the screen continuously (sizes doubled)
+// Reduced to 3 planes (was 6) — fewer concurrent infinite animations = less GPU pressure
 const planes = [
-  { id: 1, startX: -5, startY: 12, endX: 105, endY: 8,  size: 32, duration: 45, delay: 0,  rotate: -15 },
-  { id: 2, startX: 105, startY: 30, endX: -5,  endY: 25, size: 28, duration: 55, delay: 8,  rotate: 165 },
-  { id: 3, startX: -5, startY: 55, endX: 105, endY: 48, size: 36, duration: 50, delay: 15, rotate: -10 },
-  { id: 4, startX: 105, startY: 72, endX: -5,  endY: 68, size: 24, duration: 60, delay: 22, rotate: 170 },
-  { id: 5, startX: -5, startY: 88, endX: 105, endY: 82, size: 30, duration: 48, delay: 5,  rotate: -20 },
+  { id: 1, startX: -5,  startY: 12, endX: 105, endY: 8,  size: 32, duration: 45, delay: 0,  rotate: -15 },
+  { id: 3, startX: -5,  startY: 55, endX: 105, endY: 48, size: 36, duration: 50, delay: 15, rotate: -10 },
   { id: 6, startX: 105, startY: 18, endX: -5,  endY: 15, size: 26, duration: 52, delay: 30, rotate: 175 },
 ];
 
-// Floating pages/sheets/assets data structure
+// Reduced to 2 floating sheets (was 4) — decorative value maintained with lower paint cost
 const floatingSheets = [
-  { id: 's1', type: 'page', startX: -10, startY: 22, endX: 110, endY: 16, size: 70, duration: 72, delay: 2, rotateStart: 12, rotateEnd: 36 },
-  { id: 's2', type: 'data', startX: 110, startY: 58, endX: -10, endY: 52, size: 75, duration: 84, delay: 15, rotateStart: -15, rotateEnd: -42 },
-  { id: 's3', type: 'feather', startX: -10, startY: 78, endX: 110, endY: 70, size: 55, duration: 65, delay: 8, rotateStart: -30, rotateEnd: 30 },
-  { id: 's4', type: 'magnifier', startX: 110, startY: 35, endX: -10, endY: 28, size: 50, duration: 78, delay: 20, rotateStart: 0, rotateEnd: 360 },
+  { id: 's1', type: 'page',    startX: -10,  startY: 22, endX: 110, endY: 16, size: 70, duration: 72, delay: 2,  rotateStart: 12,  rotateEnd: 36 },
+  { id: 's3', type: 'feather', startX: -10,  startY: 78, endX: 110, endY: 70, size: 55, duration: 65, delay: 8,  rotateStart: -30, rotateEnd: 30 },
 ];
 
 // Trend lines data for chart-like watermarks

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, Playfair_Display } from "next/font/google";
 import { GlobalProviders } from "~/providers/global";
-import { BackgroundWatermarks } from "~/components/background-watermarks";
+import { LazyBackgroundWatermarks } from "~/components/watermarks-lazy";
 import './globals.css'
 
 const inter = Inter({
@@ -16,6 +16,7 @@ const playfair = Playfair_Display({
   display: "swap",
 });
 
+
 export const metadata: Metadata = {
   title: "Inquest | Thoughtful Enquiries",
   description: "Ask questions that reach the people who know. Data over intuition.",
@@ -29,6 +30,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
+        {/* Preload self-hosted background images to avoid layout shift */}
+        <link rel="preload" as="image" href="/images/bg-light.jpg" />
+
         {/* Dark-mode hydration + Paper Roll toggle + OS preference listener */}
         <script dangerouslySetInnerHTML={{ __html: `
           (function() {
@@ -78,8 +82,8 @@ export default function RootLayout({
         ` }} />
       </head>
       <body className={`${inter.variable} ${playfair.variable} antialiased`}>
-        {/* Animated watermarks — paper planes + data trend lines */}
-        <BackgroundWatermarks />
+        {/* Animated watermarks — deferred client-side load */}
+        <LazyBackgroundWatermarks />
 
         {/* Content — transparent background so body's lined-paper shows through */}
         <div className="relative z-10 min-h-screen flex flex-col">
