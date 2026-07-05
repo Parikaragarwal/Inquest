@@ -95,27 +95,52 @@ sudo certbot --nginx -d inquest.parikar.in -d api.inquest.parikar.in
 
 ---
 
-## 🔄 Routine Deployment / Update Workflow
+---
 
-Whenever you push changes to your repository, deployment on the VPS requires only:
+## ⚡ Automated CI/CD Pipeline (GitHub Actions)
+
+Deployments are automated on every `git push origin main` via **.github/workflows/deploy.yml**.
+
+### 1. GitHub Repository Secrets Required
+Add these secrets under **GitHub Repository Settings -> Secrets and variables -> Actions**:
+
+| Secret Name | Value | Example |
+| :--- | :--- | :--- |
+| `VPS_HOST` | Server IP or Domain | `46.225.87.125` |
+| `VPS_USERNAME` | SSH User | `deployer` |
+| `VPS_SSH_KEY` | Private SSH Key content | `-----BEGIN OPENSSH PRIVATE KEY-----...` |
+| `VPS_PORT` | *(Optional)* SSH Port | `22` (Default) |
+
+### 2. Manual / One-Command VPS Deployment
+You can also trigger a manual deployment anytime directly on the VPS by running:
 
 ```bash
-cd ~/projects/inquest
-git pull
-docker compose build
-docker compose up -d
+cd /home/deployer/projects/Inquest
+./scripts/deploy.sh
 ```
 
-If database schema changes were made:
+### 3. Production-Grade Pipeline Features (v2)
+The deployment script (`scripts/deploy.sh`) implements the following production features:
+- **Concurrency Protection (`flock`)**: Uses a non-blocking process lock (`/tmp/inquest-deploy.lock`) to prevent simultaneous or overlapping deployments.
+- **Strict Error Handling (`set -Eeuo pipefail`)**: Catches unbound variables, pipeline failures, and ERR signals across function scopes.
+- **Recursion-Safe ERR Trap**: Disables the error trap inside failure handlers to avoid recursive loops if error handling steps fail.
+- **Full SHA Tracking**: Uses 40-character Git commit SHAs (`PREVIOUS_COMMIT` & `CURRENT_COMMIT`) to avoid short SHA collisions.
+- **Pre-flight Daemon & Network Checks**: Verifies Docker daemon status (`docker info`) and `infra-network` before executing any builds.
+- **Log Rotation**: Automatically rotates `deploy.log` to `deploy.log.old` when log size exceeds 5MB.
+- **Container Readiness & Migration**: Waits for container readiness (`docker compose exec -T inquest_api true`), then applies database migrations (`pnpm db:migrate`).
+- **Dedicated Health Checks**: Verifies `/health` on Express API and `/api/health` on Next.js Web with a 50-second timeout window before declaring success.
+- **Execution Timer**: Tracks exact deployment duration in seconds.
+
 ```bash
-docker compose exec inquest_api pnpm db:migrate
+# View deployment logs on the VPS
+tail -f /home/deployer/projects/Inquest/logs/deploy.log
 ```
 
 ---
 
 ## 🛠 Useful Aliases & Management
 
-- **View Live Logs**:
+- **View Live Container Logs**:
   ```bash
   docker compose logs -f
   ```
