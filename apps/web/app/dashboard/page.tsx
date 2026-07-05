@@ -6,7 +6,7 @@ import { trpc } from '~/trpc/client';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Plus, X, Globe, Lock, Copy, Eye, FileText, ChevronRight, Users, 
-  ClipboardCopy, Edit3, Trash2, MoreVertical 
+  ClipboardCopy, Edit3, Trash2, MoreVertical, Sparkles 
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -77,12 +77,13 @@ export default function DashboardPage() {
 
   const copyLink = (formId: string, secureCode: string | null, e: React.MouseEvent) => {
     e.stopPropagation();
-    let url = `${window.location.origin}/forms/${formId}`;
-    if (secureCode) {
-      url += `?code=${secureCode}`;
-    }
+    const url = `${window.location.origin}/forms/${formId}`;
     navigator.clipboard.writeText(url);
-    toast.success('Link copied to clipboard!');
+    if (secureCode) {
+      toast.success('Clean form link copied! (Passcode excluded for security)');
+    } else {
+      toast.success('Link copied to clipboard!');
+    }
   };
 
   const copySecureCode = (code: string, e: React.MouseEvent) => {
@@ -111,7 +112,8 @@ export default function DashboardPage() {
             <div className="bg-inquest-sage/10 border border-inquest-rule rounded-[2rem] p-5 sm:p-6 relative page-lines" style={{ '--line-height': '2rem' } as React.CSSProperties}>
               <button 
                 onClick={() => setShowCompanion(false)}
-                className="absolute top-3 right-3 sm:top-4 sm:right-4 p-2 text-inquest-ink-soft hover:text-inquest-ink transition-colors rounded-full hover:bg-inquest-depth/30"
+                className="absolute top-3 right-3 sm:top-4 sm:right-4 p-2 text-inquest-ink-soft hover:text-inquest-ink transition-colors rounded-full hover:bg-inquest-depth/30 cursor-pointer"
+                title="Dismiss Quick Guide"
               >
                 <X size={16} />
               </button>
@@ -137,7 +139,17 @@ export default function DashboardPage() {
 
       {/* Inline Form Creator */}
       <section>
-        <h2 className="text-xs sm:text-sm font-bold text-inquest-ink-soft mb-3 uppercase tracking-widest pl-2">Create New Form</h2>
+        <div className="flex items-center justify-between pl-2 pr-1 mb-3">
+          <h2 className="text-xs sm:text-sm font-bold text-inquest-ink-soft uppercase tracking-widest">Create New Form</h2>
+          {!showCompanion && (
+            <button
+              onClick={() => setShowCompanion(true)}
+              className="text-xs font-semibold text-inquest-accent hover:underline flex items-center gap-1 cursor-pointer transition-colors"
+            >
+              <Sparkles size={13} /> Show Quick Guide
+            </button>
+          )}
+        </div>
         <form onSubmit={handleCreate} className="relative flex items-center">
           <input 
             type="text"

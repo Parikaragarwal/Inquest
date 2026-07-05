@@ -1,7 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { userService } from "../../services";
 import { publicProcedure, authenticatedProcedure, router } from "../../trpc";
-import { getAuthenticationCookie, setAuthenticatonCookie } from "../../utils/cookie";
+import { clearAuthenticationCookie, getAuthenticationCookie, setAuthenticatonCookie } from "../../utils/cookie";
 import { generatePath } from "../../utils/path-generator";
 import {
   createUserWithEmailAndPasswordInputModel,
@@ -20,6 +20,8 @@ import {
   forgotPasswordOutputModel,
   resetPasswordInputModel,
   resetPasswordOutputModel,
+  signOutInputModel,
+  signOutOutputModel,
 } from "./model";
 
 const TAGS = ["Authentication"];
@@ -203,5 +205,20 @@ export const authRouter = router({
     .output(resetPasswordOutputModel)
     .mutation(async ({ input }) => {
       return userService.resetPassword(input);
+    }),
+
+  signOut: publicProcedure
+    .meta({
+      openapi: {
+        method: "POST",
+        path: getPath("/signOut"),
+        tags: TAGS,
+      },
+    })
+    .input(signOutInputModel)
+    .output(signOutOutputModel)
+    .mutation(async ({ ctx }) => {
+      clearAuthenticationCookie(ctx);
+      return { success: true };
     }),
 });

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef, memo } from 'react';
+import { useState, useEffect, useCallback, useRef, memo, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { trpc } from '~/trpc/client';
 import { motion, AnimatePresence, Reorder, useDragControls, LayoutGroup } from 'framer-motion';
@@ -13,7 +13,7 @@ import {
   Copy, ExternalLink, Users, ClipboardCopy, Edit3, GripVertical, Eye,
   Star, Sun, Moon, Sparkles, Check, Palette, Plus, X, ChevronDown, ChevronUp,
   AlertCircle, RotateCcw, QrCode, Link, ChevronLeft, ChevronRight, Asterisk,
-  Download
+  Download, ShieldAlert, Zap
 } from 'lucide-react';
 import { useGetuser } from '~/hooks/api/auth';
 import NextLink from 'next/link';
@@ -1159,20 +1159,22 @@ export default function FormBuilderPage() {
   const [showAddStrip, setShowAddStrip]         = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [hasDraft, setHasDraft]                 = useState(false);
-  const [shareUrl, setShareUrl]                 = useState('');
+  const [includeCodeInLink, setIncludeCodeInLink] = useState(false);
+  const [includeCodeInQR, setIncludeCodeInQR]     = useState(true);
   const [previewMode, setPreviewMode]           = useState<'light' | 'dark'>('light');
 
-  // BUG FIX (C5): We do NOT touch document.documentElement.classList for preview mode.
-  // The preview is scoped via inline styles in FormPreview only.
+  // Computed link and QR URLs based on user security toggles
+  const linkUrl = useMemo(() => {
+    let url = typeof window !== 'undefined' ? `${window.location.origin}/forms/${formId}` : `/forms/${formId}`;
+    if (secureCode && includeCodeInLink) url += `?code=${secureCode}`;
+    return url;
+  }, [formId, secureCode, includeCodeInLink]);
 
-  // Build share URL
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      let url = `${window.location.origin}/forms/${formId}`;
-      if (secureCode) url += `?code=${secureCode}`;
-      setShareUrl(url);
-    }
-  }, [formId, secureCode]);
+  const qrUrl = useMemo(() => {
+    let url = typeof window !== 'undefined' ? `${window.location.origin}/forms/${formId}` : `/forms/${formId}`;
+    if (secureCode && includeCodeInQR) url += `?code=${secureCode}`;
+    return url;
+  }, [formId, secureCode, includeCodeInQR]);
 
   const loadedFromServer = useRef(false);
 
@@ -1342,10 +1344,14 @@ export default function FormBuilderPage() {
   };
 
   const copyShareLink = () => {
-    let url = `${window.location.origin}/forms/${formId}`;
-    if (secureCode) url += `?code=${secureCode}`;
-    navigator.clipboard.writeText(url);
-    toast.success('Share link copied!');
+    navigator.clipboard.writeText(linkUrl);
+    if (secureCode && !includeCodeInLink) {
+      toast.success('Clean form link copied! (Passcode excluded for security)');
+    } else if (secureCode && includeCodeInLink) {
+      toast.warning('Share link copied with embedded secure code!');
+    } else {
+      toast.success('Share link copied!');
+    }
   };
 
   const addField = (type: string) => {
@@ -1739,27 +1745,99 @@ export default function FormBuilderPage() {
                       </div>
                     </div>
 
-                    {/* Share & QR — Always Visible */}
-                    <div className="bg-inquest-surface border border-inquest-rule rounded-[2rem] p-6 sm:p-8 space-y-5 warm-shadow">
-                      <h3 className="font-serif text-xl font-bold text-inquest-ink border-b border-inquest-rule/40 pb-3 flex items-center gap-2">
-                        <Link size={18} className="text-inquest-accent" />
-                        Share & Access
-                      </h3>
-
-                      {/* URL bar */}
-                      <div className="bg-inquest-base p-3 rounded-xl border border-inquest-rule flex items-center gap-2">
-                        <input type="text" readOnly value={shareUrl}
-                          className="flex-1 bg-transparent text-xs font-mono text-inquest-ink select-all focus:outline-none truncate" />
-                        <button
-                          onClick={copyShareLink}
-                          className="shrink-0 px-3 py-1.5 bg-inquest-accent text-white rounded-lg text-xs font-bold hover:bg-inquest-accent-soft transition-colors cursor-pointer"
-                        >
-                          <Copy size={12} />
-                        </button>
+                    {/* Share & QR Controls */}
+                    <div className="bg-inquest-surface border border-inquest-rule rounded-[2rem] p-6 sm:p-8 space-y-6 warm-shadow">
+                      <div className="flex items-center justify-between border-b border-inquest-rule/40 pb-4">
+                        <h3 className="font-serif text-xl font-bold text-inquest-ink flex items-center gap-2">
+                          <Link size={18} className="text-inquest-accent" />
+                          Share & Access Controls
+                        </h3>
+                        {secureCode ? (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-inquest-accent/10 text-inquest-accent border border-inquest-accent/20">
+                            <Lock size={12} /> Protected with Code
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-inquest-sage/15 text-inquest-ink border border-inquest-sage/30">
+                            <Globe size={12} /> Public Form
+                          </span>
+                        )}
                       </div>
 
+                      {/* URL display bar */}
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-inquest-ink-soft uppercase tracking-wider pl-1">
+                          Shareable Direct Link
+                        </label>
+                        <div className="bg-inquest-base p-3 rounded-xl border border-inquest-rule flex items-center gap-2">
+                          <input type="text" readOnly value={linkUrl}
+                            className="flex-1 bg-transparent text-xs font-mono text-inquest-ink select-all focus:outline-none truncate" />
+                          <button
+                            onClick={copyShareLink}
+                            className="shrink-0 px-3.5 py-2 bg-inquest-accent text-white rounded-lg text-xs font-bold hover:bg-inquest-accent-soft transition-colors cursor-pointer flex items-center gap-1.5"
+                          >
+                            <Copy size={13} /> Copy Link
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Security embedding options */}
+                      {secureCode && (
+                        <div className="bg-inquest-depth/30 border border-inquest-rule/50 rounded-2xl p-4 sm:p-5 space-y-4">
+                          <h4 className="text-xs font-bold text-inquest-ink uppercase tracking-wider flex items-center gap-1.5">
+                            <ShieldAlert size={14} className="text-inquest-accent" />
+                            Passcode Embedding Settings
+                          </h4>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* Toggle 1: Direct Link */}
+                            <div className="bg-inquest-surface p-4 rounded-xl border border-inquest-rule/40 space-y-3">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-xs font-bold text-inquest-ink">Include Code in Direct Link</span>
+                                <Switch
+                                  checked={includeCodeInLink}
+                                  onCheckedChange={setIncludeCodeInLink}
+                                />
+                              </div>
+                              {includeCodeInLink ? (
+                                <div className="text-[11px] text-amber-800 dark:text-amber-300 bg-amber-500/10 border border-amber-500/20 p-2.5 rounded-lg leading-relaxed flex items-start gap-2">
+                                  <AlertCircle size={14} className="shrink-0 mt-0.5" />
+                                  <span><strong>⚠️ Security Warning:</strong> Anyone clicking this direct link will bypass passcode entry.</span>
+                                </div>
+                              ) : (
+                                <div className="text-[11px] text-inquest-ink-soft bg-inquest-base/60 border border-inquest-rule/30 p-2.5 rounded-lg leading-relaxed flex items-start gap-2">
+                                  <Lock size={14} className="shrink-0 mt-0.5 text-inquest-accent" />
+                                  <span><strong>🔒 Secure Mode:</strong> Link does not contain passcode. Recipient must type code manually.</span>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Toggle 2: QR Code */}
+                            <div className="bg-inquest-surface p-4 rounded-xl border border-inquest-rule/40 space-y-3">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-xs font-bold text-inquest-ink">Include Code in QR Code</span>
+                                <Switch
+                                  checked={includeCodeInQR}
+                                  onCheckedChange={setIncludeCodeInQR}
+                                />
+                              </div>
+                              {includeCodeInQR ? (
+                                <div className="text-[11px] text-emerald-800 dark:text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 p-2.5 rounded-lg leading-relaxed flex items-start gap-2">
+                                  <Zap size={14} className="shrink-0 mt-0.5" />
+                                  <span><strong>⚡ QR Scan Action:</strong> Scanning this QR code automatically logs the user in and bypasses the passcode prompt.</span>
+                                </div>
+                              ) : (
+                                <div className="text-[11px] text-inquest-ink-soft bg-inquest-base/60 border border-inquest-rule/30 p-2.5 rounded-lg leading-relaxed flex items-start gap-2">
+                                  <QrCode size={14} className="shrink-0 mt-0.5 text-inquest-accent" />
+                                  <span><strong>📋 QR Scan Action:</strong> Scanning this QR code opens the form and requires typing the passcode manually.</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
                       {/* Action buttons + QR side by side */}
-                      <div className="flex flex-col sm:flex-row gap-5">
+                      <div className="flex flex-col sm:flex-row gap-5 pt-2">
                         {/* Action buttons */}
                         <div className="flex-1 grid grid-cols-2 gap-3 content-start">
                           <button
@@ -1771,7 +1849,7 @@ export default function FormBuilderPage() {
                           </button>
                           <button
                             id="preview-btn"
-                            onClick={() => window.open(`/forms/${formId}`, '_blank')}
+                            onClick={() => window.open(linkUrl, '_blank')}
                             className="flex items-center justify-center gap-2 py-3 rounded-2xl bg-inquest-depth hover:bg-inquest-rule text-inquest-ink font-bold text-sm transition-colors cursor-pointer border border-inquest-rule"
                           >
                             <ExternalLink size={14} /> Preview
@@ -1780,7 +1858,7 @@ export default function FormBuilderPage() {
                             <button
                               id="copy-code-btn"
                               onClick={copySecureCode}
-                              className="flex items-center justify-center gap-2 py-3 rounded-2xl bg-inquest-sage/15 hover:bg-inquest-sage/25 text-inquest-ink font-bold text-sm transition-colors cursor-pointer border border-inquest-sage/25"
+                              className="flex items-center justify-center gap-2 py-3 rounded-2xl bg-inquest-sage/15 hover:bg-inquest-sage/25 text-inquest-ink font-bold text-sm transition-colors cursor-pointer border border-inquest-sage/25 col-span-2 sm:col-span-1"
                             >
                               <ClipboardCopy size={14} /> Copy Code
                             </button>
@@ -1788,10 +1866,10 @@ export default function FormBuilderPage() {
                         </div>
 
                         {/* QR Code — always visible */}
-                        {shareUrl && (
+                        {qrUrl && (
                           <div className="flex flex-col items-center gap-3 sm:border-l sm:border-inquest-rule/40 sm:pl-5">
                             <div className="bg-white p-4 rounded-2xl border border-inquest-rule/40 shadow-inner">
-                              <QRCodeSVG id="builder-qr-code" value={shareUrl} size={140} fgColor="#3A2312" bgColor="#ffffff" level="H" />
+                              <QRCodeSVG id="builder-qr-code" value={qrUrl} size={140} fgColor="#3A2312" bgColor="#ffffff" level="H" />
                             </div>
                             <button onClick={downloadQR} className="text-xs text-inquest-accent font-bold hover:underline cursor-pointer flex items-center gap-1">
                               <Download size={12} /> Download QR SVG

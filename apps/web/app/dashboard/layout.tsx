@@ -58,9 +58,20 @@ export default function DashboardLayout({
     }
   }, [showProfileEdit, user]);
 
-  const logout = () => {
-    document.cookie = "authentication-token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-    window.location.href = '/login';
+  const signOutMutation = trpc.auth.signOut.useMutation({
+    onSettled: () => {
+      document.cookie = "authentication-token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+      window.location.href = '/login';
+    }
+  });
+
+  const logout = async () => {
+    try {
+      await signOutMutation.mutateAsync();
+    } catch {
+      document.cookie = "authentication-token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+      window.location.href = '/login';
+    }
   };
 
   const toggleTheme = () => {

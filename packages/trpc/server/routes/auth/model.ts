@@ -79,3 +79,8 @@ export const resetPasswordInputModel = z.object({
 export const resetPasswordOutputModel = z.object({
     success: z.boolean(),
 })
+
+export const signOutInputModel = z.undefined();
+export const signOutOutputModel = z.object({
+    success: z.boolean(),
+});

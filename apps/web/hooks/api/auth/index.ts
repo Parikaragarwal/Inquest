@@ -75,3 +75,17 @@ export const useGetuser = ()=>{
         status
     }
 }
+
+export const useLogout = () => {
+    const utils = trpc.useUtils();
+    const { mutateAsync: signOutAsync, mutate: signOut } = trpc.auth.signOut.useMutation({
+        onSuccess: async () => {
+            await utils.auth.getLoggedInUserInfo.invalidate();
+        }
+    });
+
+    return {
+        signOut,
+        signOutAsync
+    }
+}
