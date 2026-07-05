@@ -4,7 +4,7 @@ import { useGetuser } from '~/hooks/api/auth';
 import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { LogOut, LayoutDashboard, Menu, X, UserCog, Sun, Moon, BookOpen } from 'lucide-react';
+import { LogOut, LayoutDashboard, Menu, X, UserCog, Sun, Moon, BookOpen, house } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { trpc } from '~/trpc/client';
 import { toast } from 'sonner';
@@ -90,6 +90,7 @@ export default function DashboardLayout({
   }
 
   const navLinks = [
+    { href: '/', label: 'Home', icon: house, active: pathname === '/' },
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, active: pathname === '/dashboard' },
   ];
 
