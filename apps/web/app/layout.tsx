@@ -47,7 +47,7 @@ export default function RootLayout({
                 var overlay = document.createElement('div');
                 overlay.className = 'paper-roll-overlay';
                 if (toDark) {
-                  overlay.style.backgroundColor = '#0B0705';
+                  overlay.style.backgroundColor = '#110D0A';
                   overlay.style.backgroundImage = 'repeating-linear-gradient(to bottom, transparent, transparent 31px, rgba(224,111,40,0.12) 31px, rgba(224,111,40,0.12) 32px)';
                 }
                 document.body.appendChild(overlay);

@@ -128,12 +128,7 @@ export default function DashboardPage() {
     if (!newTitle.trim()) return;
     createForm.mutate({
       title: newTitle.trim(),
-      fields: [{
-        label: 'Untitled Question',
-        type: 'text',
-        required: false,
-        orderIndex: 0
-      }],
+      fields: [],
       isOpenForSubmission: false,
     });
   };
@@ -327,16 +322,16 @@ export default function DashboardPage() {
                           {form.title}
                         </h3>
                         {form.secureCode ? (
-                          <span className="flex items-center gap-1 text-[10px] uppercase tracking-wider bg-inquest-depth text-inquest-ink-soft px-2.5 py-0.5 rounded-full font-bold shrink-0">
+                          <span className="flex items-center gap-1 text-[10px] uppercase tracking-wider bg-stone-200/80 dark:bg-inquest-depth text-stone-800 dark:text-inquest-ink-mid px-2.5 py-0.5 rounded-full font-bold shrink-0 border border-stone-300 dark:border-inquest-rule/50">
                             <Lock size={10} /> Private
                           </span>
                         ) : (
-                          <span className="flex items-center gap-1 text-[10px] uppercase tracking-wider bg-inquest-accent/10 text-inquest-accent px-2.5 py-0.5 rounded-full font-bold shrink-0">
+                          <span className="flex items-center gap-1 text-[10px] uppercase tracking-wider bg-amber-100 dark:bg-inquest-accent/15 text-amber-900 dark:text-inquest-accent px-2.5 py-0.5 rounded-full font-bold shrink-0 border border-amber-300/80 dark:border-inquest-accent/30">
                             <Globe size={10} /> Public
                           </span>
                         )}
                       </div>
-                      <p className="text-sm text-inquest-ink-soft line-clamp-2">
+                      <p className="text-sm text-inquest-ink-mid dark:text-inquest-ink-soft line-clamp-2">
                         {form.description || 'No description provided.'}
                       </p>
                     </div>
@@ -361,8 +356,8 @@ export default function DashboardPage() {
                       disabledLabel="Submissions Closed"
                       enabledIcon={ToggleRight}
                       disabledIcon={ToggleLeft}
-                      enabledClass="bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/50"
-                      disabledClass="bg-inquest-depth/40 text-inquest-ink-soft border-inquest-rule/40"
+                      enabledClass="bg-green-50 dark:bg-emerald-950/40 text-green-800 dark:text-emerald-300 border-green-200 dark:border-emerald-700/60 shadow-2xs font-extrabold"
+                      disabledClass="bg-stone-200/80 dark:bg-stone-900/50 text-stone-800 dark:text-stone-300 border-stone-300 dark:border-stone-700 font-bold"
                       loading={setSubmissionStatus.isPending}
                       onClick={(e) =>
                         triggerQuickAction(
@@ -381,8 +376,8 @@ export default function DashboardPage() {
                       disabledLabel="Open to Anyone"
                       enabledIcon={ShieldCheck}
                       disabledIcon={ShieldOff}
-                      enabledClass="bg-inquest-accent/10 text-inquest-accent border-inquest-accent/20"
-                      disabledClass="bg-inquest-depth/40 text-inquest-ink-soft border-inquest-rule/40"
+                      enabledClass="bg-amber-100 dark:bg-amber-950/40 text-amber-950 dark:text-amber-300 border-amber-300 dark:border-amber-700/60 shadow-2xs font-extrabold"
+                      disabledClass="bg-stone-200/80 dark:bg-stone-900/50 text-stone-800 dark:text-stone-300 border-stone-300 dark:border-stone-700 font-bold"
                       loading={updateForm.isPending}
                       onClick={(e) =>
                         triggerQuickAction(

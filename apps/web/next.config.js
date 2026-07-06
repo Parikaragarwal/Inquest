@@ -3,7 +3,7 @@ const nextConfig = {
   output: "standalone",
   experimental: {
     // Tree-shake heavy packages to reduce JS bundle size
-    optimizePackageImports: ["lucide-react", "framer-motion"],
+    optimizePackageImports: ["lucide-react", "framer-motion", "recharts", "qrcode.react"],
   },
 };
 

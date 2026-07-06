@@ -110,7 +110,9 @@ class FormService {
         };
       });
 
-      await tx.insert(formFieldTable).values(fieldValues);
+      if (fieldValues.length > 0) {
+        await tx.insert(formFieldTable).values(fieldValues);
+      }
 
       return formId;
     });

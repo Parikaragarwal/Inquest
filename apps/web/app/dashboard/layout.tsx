@@ -2,9 +2,9 @@
 
 import { useGetuser } from '~/hooks/api/auth';
 import { useRouter, usePathname } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
-import { LogOut, LayoutDashboard, Menu, X, UserCog, Sun, Moon, BookOpen, House } from 'lucide-react';
+import { LogOut, LayoutDashboard, Menu, X, UserCog, Sun, Moon, BookOpen, House, FileText, Shield, Edit3 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { trpc } from '~/trpc/client';
 import { toast } from 'sonner';
@@ -19,8 +19,10 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showProfileEdit, setShowProfileEdit] = useState(false);
+  const [showProfilePopover, setShowProfilePopover] = useState(false);
   const [newName, setNewName] = useState('');
   const [darkMode, setDarkMode] = useState(false);
+  const profilePopoverRef = useRef<HTMLDivElement>(null);
 
   const utils = trpc.useUtils();
 
@@ -30,6 +32,19 @@ export default function DashboardLayout({
       setDarkMode(document.documentElement.classList.contains('dark'));
     }
   }, []);
+
+  // Close profile popover on outside click
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (profilePopoverRef.current && !profilePopoverRef.current.contains(e.target as Node)) {
+        setShowProfilePopover(false);
+      }
+    }
+    if (showProfilePopover) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showProfilePopover]);
 
   const updateProfile = trpc.auth.updateProfile.useMutation({
     onSuccess: () => {
@@ -90,8 +105,10 @@ export default function DashboardLayout({
   }
 
   const navLinks = [
-    { href: '/', label: 'Home', icon: House, active: pathname === '/' },
-    { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, active: pathname === '/dashboard' },
+    { href: '/', label: 'Home', tooltip: 'Home — Landing Page', icon: House, active: pathname === '/' },
+    { href: '/dashboard', label: 'Dashboard', tooltip: 'Dashboard — My Forms', icon: LayoutDashboard, active: pathname === '/dashboard' || pathname.startsWith('/dashboard/forms') },
+    { href: '/terms', label: 'Terms', tooltip: 'Terms of Service', icon: FileText, active: pathname === '/terms' },
+    { href: '/privacy', label: 'Privacy', tooltip: 'Privacy Policy', icon: Shield, active: pathname === '/privacy' },
   ];
 
   // ─── Slim sidebar icon rail content ─────────────────────
@@ -106,26 +123,15 @@ export default function DashboardLayout({
         <BookOpen size={18} />
       </Link>
 
-      {/* User avatar */}
-      <button
-        onClick={() => setShowProfileEdit(true)}
-        className="flex items-center justify-center w-10 h-10 rounded-2xl bg-inquest-depth/60 text-inquest-ink-soft hover:text-inquest-ink hover:bg-inquest-depth transition-colors cursor-pointer mb-2"
-        title={user?.fullName || 'Edit profile'}
-      >
-        <span className="text-xs font-bold uppercase">
-          {user?.fullName?.charAt(0) || 'U'}
-        </span>
-      </button>
-
       <div className="w-6 h-px bg-inquest-rule/50 mb-1" />
 
-      {/* Nav links */}
+      {/* Nav links — Home first, then others */}
       <nav className="flex flex-col items-center gap-1.5 flex-1">
         {navLinks.map((link) => (
           <Link
             key={link.href}
             href={link.href}
-            title={link.label}
+            title={link.tooltip}
             className={`flex items-center justify-center w-10 h-10 rounded-2xl transition-all cursor-pointer ${
               link.active
                 ? 'bg-inquest-accent text-white shadow-md'
@@ -137,9 +143,9 @@ export default function DashboardLayout({
         ))}
       </nav>
 
-      {/* Bottom actions */}
+      {/* Bottom actions — theme + profile */}
       <div className="flex flex-col items-center gap-1.5 mt-auto">
-        {/* Theme toggle as slider switch */}
+        {/* Theme toggle */}
         <button
           onClick={toggleTheme}
           className="flex items-center justify-center w-10 h-10 rounded-2xl text-inquest-ink-soft hover:bg-inquest-depth/60 hover:text-inquest-ink transition-colors cursor-pointer"
@@ -148,13 +154,61 @@ export default function DashboardLayout({
           {darkMode ? <Sun size={17} /> : <Moon size={17} />}
         </button>
 
-        <button
-          onClick={logout}
-          className="flex items-center justify-center w-10 h-10 rounded-2xl text-inquest-ink-soft hover:bg-inquest-depth/60 hover:text-inquest-caution transition-colors cursor-pointer"
-          title="Sign Out"
-        >
-          <LogOut size={17} />
-        </button>
+        {/* Profile button with popover */}
+        <div className="relative" ref={profilePopoverRef}>
+          <button
+            onClick={() => setShowProfilePopover(!showProfilePopover)}
+            className="flex items-center justify-center w-10 h-10 rounded-2xl bg-inquest-depth/60 text-inquest-ink-soft hover:text-inquest-ink hover:bg-inquest-depth transition-colors cursor-pointer"
+            title={user?.fullName || 'Profile'}
+          >
+            <span className="text-xs font-bold uppercase">
+              {user?.fullName?.charAt(0) || 'U'}
+            </span>
+          </button>
+
+          {/* Profile Popover */}
+          <AnimatePresence>
+            {showProfilePopover && (
+              <motion.div
+                initial={{ opacity: 0, x: -8, scale: 0.95 }}
+                animate={{ opacity: 1, x: 0, scale: 1 }}
+                exit={{ opacity: 0, x: -8, scale: 0.95 }}
+                transition={{ duration: 0.15 }}
+                className="absolute left-full bottom-0 ml-3 w-56 bg-inquest-surface rounded-2xl border border-inquest-rule/50 shadow-xl p-4 z-50"
+              >
+                {/* User info */}
+                <div className="mb-3 pb-3 border-b border-inquest-rule/40">
+                  <p className="text-sm font-medium text-inquest-ink truncate">{user?.fullName}</p>
+                  <p className="text-[11px] text-inquest-ink-ghost truncate">{user?.email}</p>
+                </div>
+
+                {/* Edit name */}
+                <button
+                  onClick={() => {
+                    setShowProfilePopover(false);
+                    setShowProfileEdit(true);
+                  }}
+                  className="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm text-inquest-ink-mid hover:text-inquest-ink hover:bg-inquest-depth/50 rounded-xl transition-colors cursor-pointer"
+                >
+                  <Edit3 size={14} />
+                  Edit Display Name
+                </button>
+
+                {/* Sign Out */}
+                <button
+                  onClick={() => {
+                    setShowProfilePopover(false);
+                    logout();
+                  }}
+                  className="flex items-center gap-2.5 w-full px-3 py-2.5 mt-1 text-sm text-white bg-red-600 hover:bg-red-700 rounded-xl transition-colors cursor-pointer font-medium"
+                >
+                  <LogOut size={14} />
+                  Sign Out
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       </div>
     </div>
   );
@@ -167,22 +221,9 @@ export default function DashboardLayout({
           <BookOpen size={20} className="text-inquest-accent" />
           Inquest
         </Link>
-        {/* User info */}
-        <div className="mt-4 flex items-center gap-2 group">
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-inquest-ink truncate">{user?.fullName}</p>
-            <p className="text-[11px] text-inquest-ink-ghost truncate">{user?.email}</p>
-          </div>
-          <button
-            onClick={() => setShowProfileEdit(true)}
-            className="p-1.5 text-inquest-ink-ghost hover:text-inquest-ink hover:bg-inquest-depth rounded-full transition-colors shrink-0 cursor-pointer"
-            title="Edit display name"
-          >
-            <UserCog size={14} />
-          </button>
-        </div>
       </div>
 
+      {/* Navigation — Home first */}
       <nav className="flex-1 px-3 space-y-1">
         {navLinks.map((link) => (
           <Link
@@ -200,7 +241,23 @@ export default function DashboardLayout({
         ))}
       </nav>
 
-      <div className="p-4 space-y-1">
+      {/* Bottom: Profile section + actions */}
+      <div className="p-4 space-y-1 border-t border-inquest-rule/30 mt-auto">
+        {/* User info */}
+        <div className="px-4 py-2 mb-1">
+          <p className="text-sm font-medium text-inquest-ink truncate">{user?.fullName}</p>
+          <p className="text-[11px] text-inquest-ink-ghost truncate">{user?.email}</p>
+        </div>
+
+        {/* Edit profile */}
+        <button
+          onClick={() => setShowProfileEdit(true)}
+          className="flex items-center gap-3 px-4 py-2.5 w-full text-left rounded-xl text-inquest-ink-soft hover:bg-inquest-depth/50 hover:text-inquest-ink transition-colors cursor-pointer text-sm"
+        >
+          <Edit3 size={17} />
+          Edit Display Name
+        </button>
+
         {/* Theme toggle */}
         <button
           onClick={toggleTheme}
@@ -209,9 +266,11 @@ export default function DashboardLayout({
           {darkMode ? <Sun size={17} /> : <Moon size={17} />}
           {darkMode ? 'Light Mode' : 'Dark Mode'}
         </button>
+
+        {/* Sign Out — prominent red bg */}
         <button
           onClick={logout}
-          className="flex items-center gap-3 px-4 py-2.5 w-full text-left rounded-xl text-inquest-ink-soft hover:bg-inquest-depth/50 hover:text-inquest-caution transition-colors cursor-pointer text-sm"
+          className="flex items-center gap-3 px-4 py-2.5 w-full text-left rounded-xl text-white bg-red-600 hover:bg-red-700 transition-colors cursor-pointer text-sm font-medium mt-2"
         >
           <LogOut size={17} />
           Sign Out

@@ -121,12 +121,12 @@ const initializeTheme = (serverTheme: any) => {
     const isDark = serverTheme.mode === 'dark';
     return {
       lightMode: {
-        backgroundColor: isDark ? '#F5EFEB' : (serverTheme.backgroundColor || '#F5EFEB'),
+        backgroundColor: isDark ? '#F4EEE9' : (serverTheme.backgroundColor || '#F4EEE9'),
         accentColor:     isDark ? '#D97436' : (serverTheme.accentColor || '#D97436'),
         backgroundId:    isDark ? 'none'    : (serverTheme.backgroundId || 'none'),
       },
       darkMode: {
-        backgroundColor: isDark ? (serverTheme.backgroundColor || '#0B0705') : '#0B0705',
+        backgroundColor: isDark ? (serverTheme.backgroundColor || '#110D0A') : '#110D0A',
         accentColor:     isDark ? (serverTheme.accentColor || '#E06F28')    : '#E06F28',
         backgroundId:    isDark ? (serverTheme.backgroundId || 'none')      : 'none',
       },
@@ -136,8 +136,8 @@ const initializeTheme = (serverTheme: any) => {
   }
 
   return {
-    lightMode: { backgroundColor: '#F5EFEB', accentColor: '#D97436', backgroundId: 'none' },
-    darkMode:  { backgroundColor: '#0B0705', accentColor: '#E06F28', backgroundId: 'none' },
+    lightMode: { backgroundColor: '#F4EEE9', accentColor: '#D97436', backgroundId: 'none' },
+    darkMode:  { backgroundColor: '#110D0A', accentColor: '#E06F28', backgroundId: 'none' },
     mode: 'light',
     fieldColor: '',
   };
@@ -651,10 +651,16 @@ const FieldCard = memo(function FieldCard({
           </button>
           <button
             onClick={onToggleExpand}
-            aria-label={isExpanded ? 'Collapse field config' : 'Expand field config'}
-            className="p-2 text-inquest-ink-soft hover:text-inquest-ink rounded-xl hover:bg-inquest-depth/50 transition-colors cursor-pointer"
+            aria-label={isExpanded ? 'Close field config' : 'Edit field config'}
+            className={cn(
+              'flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border',
+              isExpanded
+                ? 'bg-inquest-accent text-white border-inquest-accent shadow-xs'
+                : 'bg-stone-200/80 dark:bg-inquest-depth text-stone-800 dark:text-inquest-ink border-stone-300 dark:border-inquest-rule/60 hover:bg-inquest-accent/15 hover:text-inquest-accent hover:border-inquest-accent/40'
+            )}
           >
-            {isExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+            <Edit3 size={12} />
+            <span>{isExpanded ? 'Done' : 'Edit Field'}</span>
           </button>
           <button
             onClick={(e) => onRemove(idx, e)}
@@ -1544,24 +1550,37 @@ export default function FormBuilderPage() {
                 <div className="flex-1 overflow-y-auto p-6 sm:p-10 pb-12">
                   <div className="max-w-full space-y-3">
 
-                    {/* Empty state */}
-                    {fields.length === 0 && !showAddStrip && (
+                    {/* Empty state — shown when 0 fields exist */}
+                    {fields.length === 0 && (
                       <motion.div
                         initial={{ opacity: 0, y: 12 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="text-center py-16 px-6 bg-inquest-surface border border-inquest-rule border-dashed rounded-[2.5rem]"
+                        className="text-center py-12 px-6 bg-inquest-surface/90 border-2 border-inquest-rule/60 border-dashed rounded-[2.5rem] space-y-6 warm-shadow"
                       >
-                        <Sparkles className="mx-auto h-10 w-10 text-inquest-accent mb-4" />
-                        <h3 className="text-2xl font-serif text-inquest-ink font-bold mb-1">Begin your enquiry.</h3>
-                        <p className="text-inquest-ink-mid text-sm max-w-xs mx-auto leading-relaxed mb-8">
-                          Every great form starts with a single question. Add your first field below.
-                        </p>
-                        <button
-                          onClick={() => setShowAddStrip(true)}
-                          className="inline-flex items-center gap-2 px-6 py-3 bg-inquest-accent text-white rounded-full font-bold terracotta-glow hover:bg-inquest-accent-soft transition-colors cursor-pointer text-sm"
-                        >
-                          <Plus size={16} /> Add First Question
-                        </button>
+                        <div className="w-14 h-14 bg-inquest-accent/10 rounded-full flex items-center justify-center mx-auto text-inquest-accent">
+                          <Plus size={24} />
+                        </div>
+                        <div>
+                          <h3 className="text-2xl font-serif text-inquest-ink font-bold mb-1">Your enquiry is empty.</h3>
+                          <p className="text-inquest-ink-mid text-sm max-w-sm mx-auto leading-relaxed">
+                            Click any question type below to create your first field.
+                          </p>
+                        </div>
+
+                        {/* Quick field type selector pills */}
+                        <div className="flex flex-wrap justify-center gap-2 max-w-2xl mx-auto pt-1">
+                          {FIELD_TYPES.map(({ type, label, icon: Icon }) => (
+                            <button
+                              key={type}
+                              type="button"
+                              onClick={() => addField(type)}
+                              className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-stone-200/80 dark:bg-inquest-depth text-stone-900 dark:text-inquest-ink font-bold text-xs border border-stone-300 dark:border-inquest-rule/60 hover:bg-inquest-accent hover:text-white hover:border-inquest-accent transition-all cursor-pointer shadow-xs"
+                            >
+                              <Icon size={14} />
+                              <span>{label}</span>
+                            </button>
+                          ))}
+                        </div>
                       </motion.div>
                     )}
 
@@ -1703,8 +1722,8 @@ export default function FormBuilderPage() {
                           </span>
                           <span className="text-[10px] text-inquest-ink-soft mt-0.5 block">Toggle public submissions open or closed</span>
                           {isOpenForSubmission ? (
-                            <span className="inline-flex items-center gap-1.5 text-[9px] font-extrabold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30 dark:text-emerald-400 px-2 py-0.5 rounded-full mt-1.5 select-none">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+                            <span className="inline-flex items-center gap-1.5 text-[9px] font-extrabold text-green-800 bg-green-100/70 dark:bg-emerald-950/30 dark:text-emerald-400 px-2 py-0.5 rounded-full mt-1.5 select-none border border-green-300/50 dark:border-emerald-800/40">
+                              <span className="w-1.5 h-1.5 rounded-full bg-green-600 dark:bg-emerald-500 dark:animate-ping" />
                               Accepting Submissions
                             </span>
                           ) : (
@@ -1891,7 +1910,7 @@ export default function FormBuilderPage() {
                                 />
                               </div>
                               {includeCodeInQR ? (
-                                <div className="text-[11px] text-emerald-800 dark:text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 p-2.5 rounded-lg leading-relaxed flex items-start gap-2">
+                                <div className="text-[11px] text-teal-800 dark:text-emerald-300 bg-teal-50 dark:bg-emerald-500/10 border border-teal-200/50 dark:border-emerald-500/20 p-2.5 rounded-lg leading-relaxed flex items-start gap-2">
                                   <Zap size={14} className="shrink-0 mt-0.5" />
                                   <span><strong>⚡ QR Scan Action:</strong> Scanning this QR code automatically logs the user in and bypasses the passcode prompt.</span>
                                 </div>

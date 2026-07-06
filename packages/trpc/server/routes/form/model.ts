@@ -57,7 +57,7 @@ export const createFormInputModel = z.object({
   isOpenForSubmission: z.boolean().default(true),
   requiresAuth: z.boolean().default(true),
   theme: z.record(z.string(), z.unknown()).optional().nullable(),
-  fields: z.array(fieldInputModel).min(1),
+  fields: z.array(fieldInputModel).default([]),
 });
 
 export const createFormOutputModel = formOutputModel;
@@ -72,7 +72,7 @@ export const updateFormInputModel = z.object({
   isOpenForSubmission: z.boolean().optional(),
   requiresAuth: z.boolean().optional(),
   theme: z.record(z.string(), z.unknown()).optional().nullable(),
-  fields: z.array(fieldInputModel).min(1),
+  fields: z.array(fieldInputModel).default([]),
 });
 
 export const updateFormOutputModel = formOutputModel;

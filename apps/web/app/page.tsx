@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { useGetuser } from '~/hooks/api/auth';
-import { ArrowRight, BarChart3, Lock, Palette, Sun, Moon, BookOpen, PenLine, Shield, Eye, Star } from 'lucide-react';
+import { ArrowRight, BarChart3, Lock, Palette, Sun, Moon, BookOpen, PenLine, Shield, Eye, Star, Zap, Timer, KeyRound, Bug } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
@@ -500,6 +500,88 @@ export default function LandingPage() {
               >
                 <div className="w-9 h-9 rounded-xl bg-inquest-accent/10 flex items-center justify-center mb-4">
                   <item.icon size={18} className="text-inquest-accent" />
+                </div>
+                <h4 className="font-serif font-bold text-inquest-ink text-base mb-2">{item.title}</h4>
+                <p className="text-xs text-inquest-ink-mid leading-relaxed">{item.desc}</p>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ═══════════════════════════════════════════════════════
+          SECURITY & TRUST — Honeypot, Rate Limiting, etc.
+          ═══════════════════════════════════════════════════════ */}
+      <section className="relative z-10 py-16 sm:py-24 px-6 border-t border-inquest-rule/20">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center max-w-2xl mx-auto mb-14">
+            <span className="text-xs font-bold tracking-[0.2em] text-inquest-accent uppercase bg-inquest-accent/10 px-3 py-1 rounded-full">
+              Security & Trust
+            </span>
+            <h3 className="text-3xl sm:text-4xl font-serif font-bold text-inquest-ink mt-4">
+              Built-In Protection, By Default
+            </h3>
+            <p className="text-inquest-ink-mid text-sm sm:text-base mt-3 leading-relaxed">
+              Every form you create is protected by multiple layers of security — no configuration required.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[
+              {
+                title: 'Honeypot Anti-Bot Fields',
+                desc: 'Invisible trap fields that catch automated bots before they can submit spam. Zero friction for real users — instant rejection for bots.',
+                icon: Bug,
+                tag: 'Auto-Enabled',
+              },
+              {
+                title: 'Redis Rate Limiting',
+                desc: 'Every submission endpoint is throttled by IP-based Redis rate limiters. Prevents abuse, brute-force attacks, and submission flooding.',
+                icon: Timer,
+                tag: 'Server-Side',
+              },
+              {
+                title: 'Passcode-Gated Access',
+                desc: 'Lock any form behind a secure code. Share it only with people who should have access — and control whether QR codes include the code.',
+                icon: KeyRound,
+                tag: 'Configurable',
+              },
+              {
+                title: 'Login-Required Submissions',
+                desc: 'Optionally require respondents to authenticate before submitting. Block anonymous access while maintaining a frictionless experience.',
+                icon: Shield,
+                tag: 'Optional',
+              },
+              {
+                title: 'HttpOnly JWT Sessions',
+                desc: 'Authentication tokens are stored as HttpOnly cookies — invisible to JavaScript and immune to XSS token theft.',
+                icon: Lock,
+                tag: 'Always-On',
+              },
+              {
+                title: 'OTP Rate Throttling',
+                desc: 'Login code requests are throttled per-email with Redis. Prevents abuse of the email verification system.',
+                icon: Zap,
+                tag: 'Server-Side',
+              },
+            ].map((item, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 15 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: '-50px' }}
+                transition={{ delay: i * 0.08 }}
+                className="bg-inquest-surface/60 backdrop-blur-sm p-6 rounded-[1.5rem] border border-inquest-rule/40 hover:border-inquest-accent/40 hover:-translate-y-1.5 hover:shadow-md transition-all duration-300 relative overflow-hidden"
+              >
+                {/* Accent top stripe */}
+                <div className="absolute top-0 left-0 right-0 h-0.5 bg-inquest-accent/60" />
+                <div className="flex items-start justify-between mb-4">
+                  <div className="w-9 h-9 rounded-xl bg-inquest-accent/10 flex items-center justify-center">
+                    <item.icon size={18} className="text-inquest-accent" />
+                  </div>
+                  <span className="text-[9px] font-bold text-inquest-accent bg-inquest-accent/10 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                    {item.tag}
+                  </span>
                 </div>
                 <h4 className="font-serif font-bold text-inquest-ink text-base mb-2">{item.title}</h4>
                 <p className="text-xs text-inquest-ink-mid leading-relaxed">{item.desc}</p>

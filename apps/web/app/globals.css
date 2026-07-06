@@ -1,13 +1,13 @@
 @import "tailwindcss";
 
 :root {
-  --color-inquest-base: #F5EFEB;
-  --color-inquest-surface: #FAF5F2;
+  --color-inquest-base: #F4EEE9;
+  --color-inquest-surface: #FBF7F4;
   --color-inquest-depth: #ECE2DB;
-  --color-inquest-rule: #DFD0C4;
+  --color-inquest-rule: #DDD0C4;
 
-  --color-inquest-ink: #3A2312;
-  --color-inquest-ink-mid: #5B402B;
+  --color-inquest-ink: #42301F;
+  --color-inquest-ink-mid: #5E4430;
   --color-inquest-ink-soft: #856953;
   --color-inquest-ink-ghost: #BCAE9F;
 
@@ -20,12 +20,12 @@
 }
 
 .dark {
-  --color-inquest-base: #0B0705;
-  --color-inquest-surface: #0F0A08;
-  --color-inquest-depth: #150F0C;
-  --color-inquest-rule: #2D1D16;
+  --color-inquest-base: #110D0A;
+  --color-inquest-surface: #171110;
+  --color-inquest-depth: #1C1512;
+  --color-inquest-rule: #33231A;
 
-  --color-inquest-ink: #F2EBE5;
+  --color-inquest-ink: #EDE6E0;
   --color-inquest-ink-mid: #D9CFC6;
   --color-inquest-ink-soft: #A39387;
   --color-inquest-ink-ghost: #5C4D44;
@@ -218,6 +218,7 @@ html.dark {
   .card-lift {
     transform: translateY(0);
     transition: transform 0.2s ease, box-shadow 0.2s ease;
+    contain: layout style;
   }
   .card-lift:hover {
     transform: translateY(-2px);
@@ -229,52 +230,58 @@ html.dark {
 }
 
 /* ─── Neomorphic form inputs ────────────────────────────────── */
-/* Light mode: soft pressed-in look with warm shadows */
+/* Light mode: warm paper recessed look without harsh white glare */
 .neo-input {
-  background: var(--color-inquest-surface);
-  border: 1.5px solid var(--color-inquest-rule);
+  background-color: #EFE7E0;
+  border: 1.5px solid #D4C4B6;
+  color: #42301F;
   box-shadow:
-    inset 2px 2px 6px rgba(100, 70, 50, 0.08),
-    inset -2px -2px 6px rgba(255, 252, 248, 0.85),
-    0 1px 2px rgba(100, 70, 50, 0.04);
-  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+    inset 1.5px 2px 4px rgba(80, 50, 30, 0.10),
+    inset -1.5px -1.5px 4px rgba(255, 255, 255, 0.55),
+    0 1px 2px rgba(80, 50, 30, 0.04);
+  transition: box-shadow 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
   outline: none;
 }
 .neo-input:focus {
   border-color: var(--color-inquest-accent);
+  background-color: #E9E0D8;
   box-shadow:
-    inset 1px 1px 4px rgba(100, 70, 50, 0.06),
-    inset -1px -1px 4px rgba(255, 252, 248, 0.7),
-    0 0 0 3px var(--color-inquest-accent-pale),
-    0 0 0 4px rgba(200, 90, 23, 0.2);
+    inset 1px 1px 3px rgba(80, 50, 30, 0.12),
+    inset -1px -1px 3px rgba(255, 255, 255, 0.45),
+    0 0 0 2.5px rgba(200, 90, 23, 0.12);
 }
 .neo-input::placeholder {
-  color: var(--color-inquest-ink-ghost);
+  color: #8C7462;
   font-style: italic;
 }
 
 /* Dark mode neomorphic overrides */
 .dark .neo-input {
-  background: var(--color-inquest-depth);
-  border-color: var(--color-inquest-rule);
+  background-color: #1A1210;
+  border-color: #3A2A20;
+  color: #EDE6E0;
   box-shadow:
-    inset 2px 2px 6px rgba(0, 0, 0, 0.35),
-    inset -2px -2px 6px rgba(255, 255, 255, 0.03),
-    0 1px 2px rgba(0, 0, 0, 0.2);
+    inset 1.5px 2px 5px rgba(0, 0, 0, 0.40),
+    inset -1px -1px 4px rgba(255, 255, 255, 0.04),
+    0 1px 2px rgba(0, 0, 0, 0.20);
 }
 .dark .neo-input:focus {
   border-color: var(--color-inquest-accent);
+  background-color: #1E1412;
   box-shadow:
-    inset 1px 1px 4px rgba(0, 0, 0, 0.3),
-    inset -1px -1px 4px rgba(255, 255, 255, 0.02),
-    0 0 0 3px var(--color-inquest-accent-pale),
-    0 0 0 4px rgba(224, 111, 40, 0.25);
+    inset 1px 1px 3px rgba(0, 0, 0, 0.45),
+    inset -1px -1px 3px rgba(255, 255, 255, 0.03),
+    0 0 0 2.5px rgba(224, 111, 40, 0.18);
+}
+.dark .neo-input::placeholder {
+  color: #7A695D;
 }
 
 /* ─── Field card lift ──────────────────────────────────────── */
 .field-card-lift {
   transform: translateY(0) scale(1);
   transition: box-shadow 0.22s ease, transform 0.22s ease, border-color 0.22s ease;
+  contain: layout style;
 }
 .field-card-lift:hover {
   transform: translateY(-2px) scale(1.003);

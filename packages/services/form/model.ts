@@ -19,7 +19,7 @@ export const createFormInput = z.object({
   isOpenForSubmission: z.boolean().default(true),
   requiresAuth: z.boolean().default(true),
   theme: z.record(z.string(), z.any()).optional().nullable(),
-  fields: z.array(fieldInput).min(1, "At least one field is required"),
+  fields: z.array(fieldInput).default([]),
 });
 
 export const updateFormInput = z.object({
@@ -31,7 +31,7 @@ export const updateFormInput = z.object({
   isOpenForSubmission: z.boolean().optional(),
   requiresAuth: z.boolean().optional(),
   theme: z.record(z.string(), z.any()).optional().nullable(),
-  fields: z.array(fieldInput).min(1, "At least one field is required"),
+  fields: z.array(fieldInput).default([]),
 });
 
 export type FieldInputType = z.infer<typeof fieldInput>;
